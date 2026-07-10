@@ -1,0 +1,1 @@
+../../standard/tools/ads-lint.py

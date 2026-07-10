@@ -1,0 +1,26 @@
+# Reference CI — lint this project against the Agent Docs Standard on every push/PR.
+#
+# The linter is vendored at .ads/ads-lint.py (see .ads/README.md), so this workflow is
+# self-contained: no network fetch, and pinned to the version you vendored. The linter is
+# zero-dependency, so the runner needs nothing beyond Python (PyYAML is used only if present).
+name: ads-lint
+
+on:
+  push:
+  pull_request:
+  # Docs pointers can break when code moves, so lint on every change rather than a paths filter.
+  # If you want to scope it, add:
+  #   paths: ["**/AGENTS.md", "**/CLAUDE.md", "**/docs/**", ".ads/**"]
+
+jobs:
+  ads-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      # --strict also fails on warnings (stale ephemeral docs, missing aliases, size budget).
+      # Drop --strict to gate on errors only.
+      - name: Lint docs against the Agent Docs Standard
+        run: python3 .ads/ads-lint.py --root . --strict

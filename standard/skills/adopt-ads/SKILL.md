@@ -156,6 +156,7 @@ Read the templates, then write real files (fill placeholders; leave `<TODO>` for
    `topology`, `ref:` (every confirmed module), `dep:` (project-level upstreams), `docs: ./docs`.
 2. **Each module `AGENTS.md`** from `AGENTS.module.md`: set `kind: module`, `up:` (relative path
    to the root's `AGENTS.md`), `ref:` (only tightly-coupled siblings), module-specific `dep:`.
+   Delete the `ref:`/`dep:` line entirely when a node has none - never leave it empty.
 3. **Fill `## Working here` from reality** (brownfield): pull build/test/run commands from
    manifests, `Makefile`/`Justfile`, or CI config. Populate `## Map` from the actual directories.
    Leave `## Constraints` minimal — capture only invariants the user states or that are obvious

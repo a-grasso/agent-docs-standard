@@ -142,6 +142,9 @@ where `hint` is a one-line description of what lives there.
 **MAY** lie outside the repository entirely (other repos, package registries, external doc
 sites) — these are the *arbitrary upstream pointers*.
 
+> A node with no upstreams **SHOULD** omit the `dep` key entirely. An empty list
+> (`dep: []`) is valid and equivalent to omitting it; the same applies to `ref`.
+
 5.3.2. Each `dep` entry **SHOULD** be an object:
 
 ```yaml

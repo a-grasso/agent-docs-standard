@@ -133,10 +133,28 @@ def _parse_flow_map(s):
     return d
 
 
+def _parse_flow_seq(s):
+    """Parse `[a, b]` / `[{ id: x }]` / `[]` into a list, matching what PyYAML
+    would produce - without this, `dep: []` parses as the string "[]" and is
+    then reported as an unresolvable pointer."""
+    s = s.strip()
+    if s.startswith("["):
+        s = s[1:]
+    if s.endswith("]"):
+        s = s[:-1]
+    items = []
+    for part in _split_top(s, ","):
+        part = part.strip()
+        if not part:
+            continue
+        items.append(_parse_flow_map(part) if part.startswith("{") else _unquote(part))
+    return items
+
+
 def _minimal_parse(fm_text):
-    """Parse the ADS frontmatter subset: scalars, and block lists whose items
-    are flow-maps (`- { a: b }`), block-maps (`- a: b` + indented `c: d`), or
-    plain scalars (`- foo`)."""
+    """Parse the ADS frontmatter subset: scalars, flow sequences (`[a, b]`),
+    and block lists whose items are flow-maps (`- { a: b }`), block-maps
+    (`- a: b` + indented `c: d`), or plain scalars (`- foo`)."""
     data = {}
     lines = fm_text.split("\n")
     i, n = 0, len(lines)
@@ -152,7 +170,7 @@ def _minimal_parse(fm_text):
         key, _, val = line.partition(":")
         key, val = key.strip(), val.strip()
         if val:
-            data[key] = _unquote(val)
+            data[key] = _parse_flow_seq(val) if val.startswith("[") else _unquote(val)
             i += 1
             continue
         # Block value follows.

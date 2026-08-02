@@ -2,15 +2,4 @@
 __pycache__/
 .serena/
 
-# The empirical evaluation lives on the `eval-phase1` branch, in its own
-# worktree at ../doc-standard-eval, and is deliberately never merged here: this
-# repo is public and eval/pilot/ contains internal data from a private repo used
-# as one of the test corpora. See eval/PLAN.md ("Publication constraint") there.
-#
-# The worktree is why it is checked out separately rather than switched between:
-# the eval tree carries ~28k untracked files (a venv, the agentbench clone,
-# caches) that no branch tracks, so `git checkout main` cannot remove them and
-# they would sit in this checkout looking like uncommitted work. This entry is a
-# backstop in case the two ever share a directory again; it only affects `main`,
-# since an ignore rule cannot hide files git already tracks.
 eval/

@@ -1,3 +1,15 @@
 .DS_Store
 __pycache__/
 .serena/
+
+# The empirical evaluation lives on the `eval-phase1` branch and is deliberately
+# never merged here - this repo is public, and eval/pilot/ contains internal
+# data from a private repo used as one of the test corpora. See
+# eval/PLAN.md ("Publication constraint") on that branch.
+#
+# Ignoring it on `main` only affects `main`: an ignore rule cannot hide files
+# git already tracks, so the eval branch is unaffected. Without this, switching
+# to `main` leaves ~28k untracked files behind (venvs, clones, caches that were
+# never tracked on any branch) and `git status` reports a bare `?? eval/` that
+# looks like uncommitted work but is not.
+eval/

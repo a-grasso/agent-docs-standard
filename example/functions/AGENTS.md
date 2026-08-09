@@ -22,16 +22,6 @@ dispatch** (deliver alerts raised by `requira` to email/webhook channels).
 - **Entry points:** `src/ingest.ts` (ingestion handler), `src/dispatch.ts` (alert dispatch).
 - **Local run:** `pnpm --filter functions dev` (uses the local event-bus emulator).
 
-## Map
-- `src/` — one file per handler; handlers are thin, logic in `src/domain/`.
-- `docs/references/event-schema.md` — the published event contracts (the boundary from ADR-0002).
-- `docs/adr/` — decisions scoped to this module.
-
-## Navigation (for agents)
-- Follow **`up:`** for platform conventions, commands, and the append-only rule (ADR-0003).
-- Follow **`ref:`** to `requira` — it consumes our events; changing an event schema affects it.
-- Follow **`dep:`** to the external API doc for the alert-dispatch REST contract we must satisfy.
-
 ## Constraints
 - **Append-only ingestion:** never update/delete a reading; corrections are new readings
   (root ADR-0003).

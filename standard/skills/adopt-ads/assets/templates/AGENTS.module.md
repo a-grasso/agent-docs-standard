@@ -20,15 +20,5 @@ updated: <YYYY-MM-DD>
 - **Entry points:** <the files an agent should read first, e.g. src/index.ts>
 - **Conventions:** <anything specific to this module>
 
-## Map
-- `<dir>/` — <what lives here>
-- `docs/adr/` — decisions scoped to this module.
-- `docs/plans/`, `docs/reviews/` — ephemeral, feature-scoped (see the standard §7).
-
-## Navigation (for agents)
-- Follow **`up:`** for project-wide conventions, commands, and the module map.
-- Follow **`ref:`** for the coupled sibling(s) listed above.
-- Follow **`dep:`** to understand the upstream interfaces this module consumes.
-
 ## Constraints
 - <Invariant an agent must respect when changing this module. Cite the ADR that governs it.>

@@ -101,9 +101,14 @@ any that do not apply:
 
 - `## Purpose` — one or two sentences: what this node is and its boundary.
 - `## Working here` — how to build, test, and run; local conventions; entry-point files.
-- `## Map` — where things are: key subdirectories and the `docs/` contents.
-- `## Navigation` — a prose restatement of the pointers and *when to follow each* (§8).
 - `## Constraints` — invariants an agent MUST respect; links to governing ADRs.
+
+4.6. **Content admissibility.** The body **SHOULD** contain only information an agent cannot
+derive from the tree itself (or can only derive at disproportionate cost): invariants,
+decisions, commands, and pointers to context outside the node. Prose that restates the
+directory listing, re-narrates the frontmatter pointers, or explains the navigation protocol
+(§8 — spec content, not instance content) **SHOULD NOT** appear. Routing information belongs
+in frontmatter `hint`s, not body prose.
 
 ---
 

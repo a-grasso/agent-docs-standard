@@ -22,18 +22,5 @@ updated: <YYYY-MM-DD>
 - **Run:** `<command>`
 - **Conventions:** <language, formatting, commit style — or link to a guide in docs/>
 
-## Map
-- `ref:` above is the authoritative module list.
-- `docs/adr/` — architecture decisions (why the system is shaped this way).
-- `docs/decisions/` — smaller decision log.
-- `docs/` may also hold `guides/`, `runbooks/`, `references/`, `domain/`.
-- Ephemeral, feature-scoped work lives per-module under `docs/plans/` and `docs/reviews/`.
-
-## Navigation (for agents)
-- Follow **`ref:`** to enter a module. Read that module's `AGENTS.md` before editing it.
-- Follow **`dep:`** to understand an upstream interface or contract you consume.
-- This node has no `up:` — it is the root. Traversing `up:` from any module lands here.
-- Read `docs/adr/` before making architectural changes.
-
 ## Constraints
 - <Project-wide invariant every agent must respect. Cite the governing ADR, e.g. see ADR-0001.>

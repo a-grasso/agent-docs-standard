@@ -7,8 +7,11 @@ repo. This cheatsheet is enough to scaffold correctly; consult the full `SPEC.md
 ## Context file
 - Every node has `AGENTS.md` (canonical). `CLAUDE.md` is a **symlink** to it (single source).
 - Keep it small (~200 lines); push detail into `docs/`.
-- Structure: YAML frontmatter, then body sections `## Purpose`, `## Working here`, `## Map`,
-  `## Navigation`, `## Constraints` (omit any that don't apply).
+- Structure: YAML frontmatter, then body sections `## Purpose`, `## Working here`,
+  `## Constraints` (omit any that don't apply).
+- Body content rule: only what an agent cannot derive from the tree (invariants, decisions,
+  commands, external pointers). No directory narration, no restating the pointers - routing
+  info belongs in frontmatter `hint`s.
 
 ## Frontmatter
 

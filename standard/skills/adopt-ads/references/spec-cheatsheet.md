@@ -56,6 +56,7 @@ name the file to read in that repo.
 ## docs/ taxonomy
 Durable (permanent record):
 - `adr/` — `NNNN-slug.md`, frontmatter `status: proposed|accepted|superseded|deprecated`.
+  A `README.md` and `_`-prefixed files (e.g. `_template.md`) may sit alongside the records.
   Immutable once accepted; reverse via a new ADR.
 - `decisions/` — lightweight, dated, append-only.
 - also: `guides/`, `runbooks/`, `references/`, `domain/`.

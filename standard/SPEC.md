@@ -229,6 +229,8 @@ below; projects **MAY** add classes, declaring each as durable or ephemeral.
 
 7.2.1. **`adr/`** — Architecture Decision Records.
 - Files **MUST** be named `NNNN-slug.md` (zero-padded sequence, e.g. `0007-event-schema.md`).
+- A `README.md` and files prefixed `_` (e.g. `_template.md`) **MAY** sit alongside the records
+  as directory scaffolding; the naming and status rules apply only to the records themselves.
 - Each ADR **MUST** carry frontmatter `status: proposed | accepted | superseded | deprecated`.
 - Once `accepted`, an ADR **MUST NOT** be edited except to change its status. A reversal is a
   **new** ADR that references the old one; the old one's status becomes `superseded` with a

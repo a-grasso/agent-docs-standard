@@ -65,6 +65,15 @@ ads-lint:
     - python3 standard/tools/ads-lint.py --root . --strict
 ```
 
+### Tests
+
+Stdlib `unittest`, no dependencies:
+
+```bash
+python3 standard/tools/test_ads_lint.py
+python3 -m unittest discover -s standard/tools -p 'test_*.py'
+```
+
 ### Try it
 
 ```bash

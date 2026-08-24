@@ -254,8 +254,9 @@ def discover_nodes(root):
         if "AGENTS.md" in filenames:
             p = os.path.join(dirpath, "AGENTS.md")
             try:
-                text = open(p, encoding="utf-8").read()
-            except OSError as e:
+                with open(p, encoding="utf-8") as fh:
+                    text = fh.read()
+            except OSError:
                 continue
             fm_text, line_count = split_frontmatter(text)
             if fm_text is None:
@@ -480,6 +481,9 @@ class Linter:
                     continue
                 full = os.path.join(dirpath, f)
                 if parent == "adr":
+                    # README.md and _-prefixed files are directory scaffolding, not records
+                    if f.lower() == "readme.md" or f.startswith("_"):
+                        continue
                     saw_adr = True
                     self._check_adr(full, f)
                 elif parent == "plans":
@@ -492,7 +496,8 @@ class Linter:
 
     def _read_fm(self, full):
         try:
-            text = open(full, encoding="utf-8").read()
+            with open(full, encoding="utf-8") as fh:
+                text = fh.read()
         except OSError:
             return {}, "unreadable"
         fm_text, _ = split_frontmatter(text)

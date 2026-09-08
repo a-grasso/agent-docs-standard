@@ -1,4 +1,4 @@
-# Agent Docs Standard (ADS) — Specification
+# Agent Docs Standard (ADS) - Specification
 
 **Version:** 1.0
 **Status:** Draft
@@ -27,24 +27,24 @@ It is deliberately silent on programming language, build system, and directory n
 
 ADS is a **profile of [AGENTS.md](https://agents.md)**, not a competing convention. The
 context file is a standard `AGENTS.md` exactly as existing tools consume it (a plain-Markdown
-file, nearest-file precedence); everything this specification adds — the frontmatter, the
-pointer graph, the `docs/` taxonomy, the lifecycle — layers on top of what AGENTS.md
+file, nearest-file precedence); everything this specification adds - the frontmatter, the
+pointer graph, the `docs/` taxonomy, the lifecycle - layers on top of what AGENTS.md
 deliberately leaves unspecified. Every ADS-conformant project is a valid AGENTS.md project.
 
 ---
 
 ## 2. Terminology
 
-- **Node** — a unit of the project that owns a context file: either the *project index* (the
+- **Node** - a unit of the project that owns a context file: either the *project index* (the
   root) or a *module*.
-- **Context file** — the Markdown file at a node's root that an agent reads first. Canonically
+- **Context file** - the Markdown file at a node's root that an agent reads first. Canonically
   `AGENTS.md`, aliased by `CLAUDE.md` (§3).
-- **Pointer** — a typed, directed edge from one node to another location, declared in
+- **Pointer** - a typed, directed edge from one node to another location, declared in
   frontmatter. One of `up`, `ref`, `dep` (§5).
-- **Pointer graph** — the directed graph formed by all pointers across all nodes.
-- **Durable doc** — a long-lived document (ADR, decision, guide) that is part of the permanent
+- **Pointer graph** - the directed graph formed by all pointers across all nodes.
+- **Durable doc** - a long-lived document (ADR, decision, guide) that is part of the permanent
   record (§7.2).
-- **Ephemeral doc** — a short-lived, feature-scoped working document (plan, review) subject to
+- **Ephemeral doc** - a short-lived, feature-scoped working document (plan, review) subject to
   garbage collection (§7.3).
 
 ---
@@ -59,10 +59,10 @@ for that name. When both exist they **MUST** resolve to identical content; the *
 mechanism is a symbolic link `CLAUDE.md → AGENTS.md` so there is a single source of truth.
 
 > Where symlinks are impractical (e.g. Windows checkouts without Developer Mode), `CLAUDE.md`
-> **MAY** instead be a one-line stub whose entire body is the import line `@AGENTS.md` —
+> **MAY** instead be a one-line stub whose entire body is the import line `@AGENTS.md` -
 > Claude Code's import syntax, which loads the target at session start. (A plain Markdown
 > link is **not** auto-loaded and does not qualify.) Duplicating content between the two is
-> **NOT** conformant — it guarantees drift.
+> **NOT** conformant - it guarantees drift.
 
 3.3. A context file **MUST** consist of a YAML **frontmatter** block (§4) followed by a
 Markdown **body** (§4.5).
@@ -210,18 +210,18 @@ that can carry a date honestly.
 A pointer's target is resolved **relative to the directory of the file that declares it**,
 unless it is an absolute URL.
 
-### 5.1 `up` — parent (cardinality 0..1)
+### 5.1 `up` - parent (cardinality 0..1)
 
 5.1.1. `up` points to the context file of the node one level broader in ownership (a module's
 `up` points at the project index, or at an intermediate parent module).
 
 5.1.2. Every `module` **MUST** declare exactly one `up`. Following `up` transitively **MUST**
-terminate at the `project-index` (no cycles — §5.5).
+terminate at the `project-index` (no cycles - §5.5).
 
-5.1.3. Semantics: **"zoom out."** An agent follows `up` to obtain broader context — project-wide
+5.1.3. Semantics: **"zoom out."** An agent follows `up` to obtain broader context - project-wide
 conventions, the module map, global constraints.
 
-### 5.2 `ref` — children / related peers (cardinality 0..n)
+### 5.2 `ref` - children / related peers (cardinality 0..n)
 
 5.2.1. `ref` is a list of pointers to context files that are **narrower** (children) or
 **laterally related** (coupled siblings).
@@ -234,11 +234,11 @@ map). On a module, `ref` **SHOULD** list only siblings with which it is tightly 
 5.2.4. `ref` entries **MAY** be plain path strings, or objects `{ at: <path>, hint: <string> }`
 where `hint` is a one-line description of what lives there.
 
-### 5.3 `dep` — upstream dependencies (cardinality 0..n)
+### 5.3 `dep` - upstream dependencies (cardinality 0..n)
 
 5.3.1. `dep` is a list of pointers to context this node **builds on but does not own**. Targets
 **MAY** lie outside the repository entirely (other repos, package registries, external doc
-sites) — these are the *arbitrary upstream pointers*.
+sites) - these are the *arbitrary upstream pointers*.
 
 > A node with no upstreams **SHOULD** omit the `dep` key entirely. An empty list
 > (`dep: []`) is valid and equivalent to omitting it; the same applies to `ref`.
@@ -296,10 +296,10 @@ conventions, and the complete `ref` module map.
 
 6.3.1. The project index **MUST** declare `topology`.
 
-6.3.2. **`monorepo`** — all modules are subdirectories under the root, which is anchored at the
+6.3.2. **`monorepo`** - all modules are subdirectories under the root, which is anchored at the
 `.git` directory. `up`/`ref` pointers are in-repo relative paths.
 
-6.3.3. **`polyrepo`** — the root is a **local workdir** that aggregates independently-versioned
+6.3.3. **`polyrepo`** - the root is a **local workdir** that aggregates independently-versioned
 module repos (e.g. as sibling checkouts or submodules). Cross-module pointers that cross a repo
 boundary **MUST** be expressed as `dep` with a git URL (or a documented sibling-workdir path).
 
@@ -332,7 +332,7 @@ a decision is an ADR.
 
 ### 7.2 Durable classes (part of the permanent record)
 
-7.2.1. **`adr/`** — Architecture Decision Records.
+7.2.1. **`adr/`** - Architecture Decision Records.
 - Files **MUST** be named `NNNN-slug.md` (zero-padded sequence, e.g. `0007-event-schema.md`).
 - A `README.md` and files prefixed `_` (e.g. `_template.md`) **MAY** sit alongside the records
   as directory scaffolding; the naming and status rules apply only to the records themselves.
@@ -341,7 +341,7 @@ a decision is an ADR.
   **new** ADR that references the old one; the old one's status becomes `superseded` with a
   pointer to the successor.
 
-7.2.2. **`decisions/`** — a lighter-weight decision log for choices too small for an ADR.
+7.2.2. **`decisions/`** - a lighter-weight decision log for choices too small for an ADR.
 Append-only; entries **SHOULD** be dated.
 
 7.2.3. **`glossary.md`** - the project's controlled vocabulary (its *ubiquitous language*).
@@ -399,9 +399,9 @@ of any implementation of them).
 
 ### 7.3 Ephemeral classes (feature-scoped, garbage-collected)
 
-7.3.1. **`plans/`** — implementation plans for in-flight work.
+7.3.1. **`plans/`** - implementation plans for in-flight work.
 
-7.3.2. **`reviews/`** — reviews of features or changes.
+7.3.2. **`reviews/`** - reviews of features or changes.
 
 7.3.3. Ephemeral files **MUST** be named `<feature-slug>-<class>[-<n>].md`
 (e.g. `alert-throttling-plan.md`, `alert-throttling-review-2.md`) and **MUST** carry
@@ -409,7 +409,7 @@ frontmatter:
 
 ```yaml
 status: draft | active | done | archived   # REQUIRED
-feature: alert-throttling                   # REQUIRED — the feature slug
+feature: alert-throttling                   # REQUIRED - the feature slug
 created: 2026-07-10                         # RECOMMENDED
 ```
 
@@ -421,7 +421,7 @@ class (an ADR, a `decisions/` entry, or an update to a module's `AGENTS.md`).
 
 7.4.2. After distillation, the ephemeral docs **SHOULD** be **garbage-collected**: either
 deleted, or moved to `docs/archive/` with `status: archived`. They **MUST NOT** be left as
-`active`/`draft` indefinitely — stale plans mislead agents.
+`active`/`draft` indefinitely - stale plans mislead agents.
 
 7.4.3. Rationale: the durable record is what agents load to understand the system; keeping it
 small and free of transient noise is what makes it loadable and trustworthy.
@@ -512,17 +512,17 @@ followed is context budget preserved.
 
 A project **MAY** claim one of three cumulative levels.
 
-**Level 1 — Minimal (navigable root).**
+**Level 1 - Minimal (navigable root).**
 - The root has an `AGENTS.md` with `kind: project-index` and `topology`.
 - Every module (if any) has an `AGENTS.md` with `kind: module` and a valid `up`.
 - The project index is reachable from every node via `up` (§6.2).
 
-**Level 2 — Navigable graph.**
+**Level 2 - Navigable graph.**
 - All of L1, plus: the index's `ref` enumerates every module (§5.2.2), and every cross-boundary
   dependency is declared as a `dep` (§5.3).
 - `up`/`ref` reciprocity holds (§5.4.1).
 
-**Level 3 — Documented & maintained.**
+**Level 3 - Documented & maintained.**
 - All of L2, plus: the `docs/` taxonomy (§7) is in use; major decisions are captured as ADRs;
   the ephemeral lifecycle (§7.4) is followed (no stale `active` plans); context files respect
   the size budget (§3.4).
@@ -536,7 +536,7 @@ A project **MAY** claim one of three cumulative levels.
 
 ---
 
-## Appendix A — Minimal conformant project
+## Appendix A - Minimal conformant project
 
 ```
 my-project/
@@ -544,7 +544,7 @@ my-project/
   CLAUDE.md          # symlink → AGENTS.md
 ```
 
-## Appendix B — Frontmatter quick reference
+## Appendix B - Frontmatter quick reference
 
 ```yaml
 # project index

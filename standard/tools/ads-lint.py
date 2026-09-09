@@ -218,6 +218,46 @@ def _minimal_parse(fm_text):
 
 
 # --------------------------------------------------------------------------- #
+# Path resolution
+# --------------------------------------------------------------------------- #
+def exists_case_sensitive(path, stop_at=None):
+    """`os.path.exists`, but case-sensitive on every host filesystem.
+
+    macOS (APFS/HFS+) and Windows resolve `../agents.md` against a file named
+    `AGENTS.md`, so a pointer with the wrong case passes locally and 404s on
+    Linux CI - the one failure a conformance linter exists to catch. Each
+    component is confirmed against the exact spelling its parent lists.
+
+    `stop_at` bounds the walk: components above the project root are supplied
+    by the checkout, not written by an author, so they are not the linter's to
+    judge.
+    """
+    p = os.path.normpath(os.path.abspath(path))
+    if not os.path.exists(p):
+        return False
+    stop = os.path.normpath(os.path.abspath(stop_at)) if stop_at else None
+    while p != stop:
+        parent, name = os.path.split(p)
+        if not name or parent == p:
+            return True          # reached the filesystem root
+        try:
+            if name not in os.listdir(parent):
+                return False
+        except OSError:
+            return False
+        p = parent
+    return True
+
+
+def case_note(path, stop_at=None):
+    """Suffix naming a case mismatch, for a target that exists case-blindly."""
+    if os.path.exists(path) and not exists_case_sensitive(path, stop_at):
+        return (" (case mismatch: the target exists under a different spelling, "
+                "so this resolves on macOS/Windows and fails on Linux)")
+    return ""
+
+
+# --------------------------------------------------------------------------- #
 # Node model
 # --------------------------------------------------------------------------- #
 @dataclass
@@ -379,10 +419,12 @@ class Linter:
                     self.add(WARN, "§5.2.4", n.path,
                              f"ref entry has no target: {entry!r}")
                     continue
-                real = os.path.realpath(os.path.join(n.directory, tgt))
-                if not os.path.exists(real):
+                joined = os.path.join(n.directory, tgt)
+                real = os.path.realpath(joined)
+                if not exists_case_sensitive(joined, self.root):
                     self.add(ERROR, "§5.2", n.path,
-                             f"ref target does not exist: {tgt}", "L2")
+                             f"ref target does not exist: {tgt}"
+                             f"{case_note(joined, self.root)}", "L2")
                 elif os.path.basename(real) not in ("AGENTS.md", "CLAUDE.md"):
                     self.add(WARN, "§5.2", n.path,
                              f"ref target is not a context file: {tgt}")
@@ -418,14 +460,17 @@ class Linter:
                              "up chain ends at a node that is not project-index",
                              "L1")
                 return
-            parent_real = os.path.realpath(os.path.join(cur.directory, up))
+            joined = os.path.join(cur.directory, up)
+            parent_real = os.path.realpath(joined)
             if parent_real == cur.real or parent_real in seen:
                 self.add(ERROR, "§5.5.1", start.path,
                          "up pointer forms a cycle", "L1")
                 return
-            if parent_real not in nodes:
+            if parent_real not in nodes or not exists_case_sensitive(
+                    joined, self.root):
                 self.add(ERROR, "§5.1", cur.path,
-                         f"up target does not resolve to a node: {up}", "L1")
+                         f"up target does not resolve to a node: {up}"
+                         f"{case_note(joined, self.root)}", "L1")
                 return
             seen.add(cur.real)
             cur = nodes[parent_real]
@@ -454,10 +499,11 @@ class Linter:
                     self._check_remote(n, dep_id or at, at)
             else:  # local path
                 local = at.split("#", 1)[0]
-                real = os.path.realpath(os.path.join(n.directory, local))
-                if not os.path.exists(real):
+                joined = os.path.join(n.directory, local)
+                if not exists_case_sensitive(joined, self.root):
                     self.add(ERROR, "§5.3.3", n.path,
-                             f"local dep target does not exist: {at}", "L2")
+                             f"local dep target does not exist: {at}"
+                             f"{case_note(joined, self.root)}", "L2")
 
     def _check_remote(self, n, dep_id, at):
         url = at.split("#", 1)[0]

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Tests for the ads-lint docs/adr/ checks (SPEC §7.2.1).
+"""Tests for ads-lint: docs/adr/ checks (§7.2.1) and case-sensitive resolution (§5).
 
 Stdlib only, matching the linter's own zero-dependency constraint. Run with:
 
@@ -154,6 +154,132 @@ class AdrScaffoldingExemption(AdrCase):
         self.adr_file("0001-use-postgres.md")
         findings = self.lint()
         self.assertEqual(missing_adr_info(findings), [])
+
+
+MODULE_AGENTS = """---
+kind: module
+title: Widgets
+up: ../{up}
+---
+
+# Widgets
+"""
+
+
+class CaseSensitiveResolution(unittest.TestCase):
+    """Pointer targets must resolve with the case they are written in (§5).
+
+    On macOS/APFS and Windows a pointer written `../agents.md` resolves against
+    a file named `AGENTS.md`, so the project lints green locally and 404s on
+    Linux CI. These tests are no-ops on a case-sensitive filesystem, where the
+    wrong-case target simply does not exist - the finding is the same either
+    way, which is the point.
+    """
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, stale_days=30, check_remote=False)
+        return ads_lint.Linter(self.root, args).run()
+
+    def index(self, ref):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               "---\nkind: project-index\ntopology: monorepo\nref:\n"
+               f"  - {ref}\n---\n\n# Fixture project\n")
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+
+    def module(self, up):
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"),
+               MODULE_AGENTS.format(up=up))
+        _write(os.path.join(self.root, "widgets", "CLAUDE.md"), "@AGENTS.md")
+
+    def errors(self, rule):
+        return [f for f in self.lint()
+                if f.level == ads_lint.ERROR and f.rule == rule]
+
+    # -- the helper itself ------------------------------------------------
+
+    def test_helper_accepts_the_exact_spelling(self):
+        _write(os.path.join(self.root, "docs", "AGENTS.md"), "x")
+        self.assertTrue(ads_lint.exists_case_sensitive(
+            os.path.join(self.root, "docs", "AGENTS.md")))
+
+    def test_helper_rejects_a_miscased_filename(self):
+        _write(os.path.join(self.root, "docs", "AGENTS.md"), "x")
+        self.assertFalse(ads_lint.exists_case_sensitive(
+            os.path.join(self.root, "docs", "agents.md")))
+
+    def test_helper_rejects_a_miscased_directory(self):
+        _write(os.path.join(self.root, "docs", "AGENTS.md"), "x")
+        self.assertFalse(ads_lint.exists_case_sensitive(
+            os.path.join(self.root, "Docs", "AGENTS.md")))
+
+    def test_helper_rejects_a_missing_path(self):
+        self.assertFalse(ads_lint.exists_case_sensitive(
+            os.path.join(self.root, "nope.md")))
+
+    def test_helper_traverses_dot_dot(self):
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"), "x")
+        _write(os.path.join(self.root, "AGENTS.md"), "x")
+        self.assertTrue(ads_lint.exists_case_sensitive(
+            os.path.join(self.root, "widgets", "..", "AGENTS.md")))
+
+    # -- the three pointer kinds ------------------------------------------
+
+    def test_ref_with_wrong_case_is_an_error(self):
+        self.index("widgets/agents.md")
+        self.module("AGENTS.md")
+        found = self.errors("§5.2")
+        self.assertEqual(len(found), 1, msgs(self.lint()))
+        self.assertIn("ref target does not exist", found[0].msg)
+
+    def test_ref_with_right_case_is_clean(self):
+        self.index("widgets/AGENTS.md")
+        self.module("AGENTS.md")
+        self.assertEqual(self.errors("§5.2"), [], msgs(self.lint()))
+
+    def test_up_with_wrong_case_is_an_error(self):
+        self.index("widgets/AGENTS.md")
+        self.module("agents.md")
+        found = self.errors("§5.1")
+        self.assertEqual(len(found), 1, msgs(self.lint()))
+        self.assertIn("up target does not resolve", found[0].msg)
+
+    def test_local_dep_with_wrong_case_is_an_error(self):
+        self.index("widgets/AGENTS.md")
+        _write(os.path.join(self.root, "docs", "references", "schema.md"), "# S\n")
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"),
+               "---\nkind: module\ntitle: Widgets\nup: ../AGENTS.md\ndep:\n"
+               "  - { id: schema, at: ../docs/references/Schema.md,"
+               " kind: repo, hint: event schema }\n---\n\n# Widgets\n")
+        _write(os.path.join(self.root, "widgets", "CLAUDE.md"), "@AGENTS.md")
+        found = self.errors("§5.3.3")
+        self.assertEqual(len(found), 1, msgs(self.lint()))
+        self.assertIn("local dep target does not exist", found[0].msg)
+
+    def test_local_dep_with_right_case_is_clean(self):
+        self.index("widgets/AGENTS.md")
+        _write(os.path.join(self.root, "docs", "references", "schema.md"), "# S\n")
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"),
+               "---\nkind: module\ntitle: Widgets\nup: ../AGENTS.md\ndep:\n"
+               "  - { id: schema, at: ../docs/references/schema.md,"
+               " kind: repo, hint: event schema }\n---\n\n# Widgets\n")
+        _write(os.path.join(self.root, "widgets", "CLAUDE.md"), "@AGENTS.md")
+        self.assertEqual(self.errors("§5.3.3"), [], msgs(self.lint()))
+
+    # -- the diagnostic ----------------------------------------------------
+
+    def test_case_mismatch_is_named_in_the_message(self):
+        """Only meaningful where the filesystem is case-insensitive."""
+        self.index("widgets/agents.md")
+        self.module("AGENTS.md")
+        target = os.path.join(self.root, "widgets", "agents.md")
+        if not os.path.exists(target):
+            self.skipTest("case-sensitive filesystem: nothing to disambiguate")
+        self.assertIn("case mismatch", self.errors("§5.2")[0].msg)
 
 
 if __name__ == "__main__":

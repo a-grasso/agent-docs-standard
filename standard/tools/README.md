@@ -30,7 +30,7 @@ python3 standard/tools/ads-lint.py --root <project> --json | jq   # machine-read
 | Area | Rules |
 |------|-------|
 | Frontmatter | valid YAML block; `kind ∈ {project-index, module}`; exactly one reachable `project-index`; `project-index` has `topology` and no `up`; `module` has `up` (§3, §4, §6.3). |
-| Pointer graph | `up`/`ref`/local-`dep` targets resolve; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). |
+| Pointer graph | `up`/`ref`/local-`dep` targets resolve **case-sensitively**, on every host filesystem; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). |
 | Aliases | a `CLAUDE.md` symlink to `AGENTS.md` exists beside each node (§3.2). |
 | Docs taxonomy | ADR filenames `NNNN-slug.md` with a valid `status`; ephemeral `plans/`/`reviews/` filename grammar + `status`/`feature`; **stale** `active`/`draft` docs past `--stale-days` (§7). |
 | Size budget | context files within `--max-lines` (§3.4). |
@@ -67,7 +67,8 @@ ads-lint:
 
 ### Tests
 
-Stdlib `unittest`, no dependencies:
+Stdlib `unittest`, no dependencies. Covers the `docs/adr/` record and scaffolding rules
+(§7.2.1) and case-sensitive pointer resolution (§5):
 
 ```bash
 python3 standard/tools/test_ads_lint.py

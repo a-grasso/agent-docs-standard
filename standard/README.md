@@ -170,6 +170,37 @@ current hop of the graph.
 - **Not tied to one vendor.** `CLAUDE.md` is an alias, not the canonical name; the standard
   works with any agent that reads a Markdown context file.
 
+## What this standard does not do
+
+The list above is about ambition. This one is about the edges, and every entry on it is a
+place where the standard deliberately stops rather than one where it has not got round to
+starting. Knowing where a tool ends is how you avoid asking it for something it will answer
+badly.
+
+- **It does not read your source code.** Not one line of it. Everything ADS knows, it knows
+  from Markdown and frontmatter. That is why §5.3.5 declares dependency *completeness*
+  normative but not certified: an undeclared dependency lives in an `import` statement, and
+  finding one means parsing every language the project builds with. Your ecosystem already
+  owns that job - an import-boundary lint rule, an architecture test - and does it properly.
+  ADS asks you to name that tool as the constraint's enforcer (§4.5.2) and gets out of the
+  way.
+- **It does not know whether a sentence is true.** §9 certifies structure. Whether a
+  constraint is really a constraint, whether a trap is really a trap, whether the routing
+  rules were followed - that is judgement, and a conformance level that claimed it would be
+  claiming more than it can establish. Levels are a floor you can automate, not a review you
+  can skip.
+- **It does not check the *content* of anything it points at.** A `dep` pointer resolves or
+  it does not. Whether the thing at the other end still says what it said when you pointed at
+  it is a different question, and a harder one: it needs content fingerprints, a notion of
+  acceptable drift, and somewhere to put the answer. That is a lockfile for cross-references,
+  which is a whole tool in its own right, and - purely hypothetically, mind - if someone were
+  to have written one and called it [reflock](https://github.com/a-grasso/reflock), the two
+  would compose rather nicely: ADS says where the pointers go, and something else says
+  whether they have gone stale. ADS is not going to grow that half itself.
+- **It does not manage work.** Status, sequencing, ownership and what is next belong to the
+  tracker (§7.3), which is the second substrate and is named by the `tracker` key rather than
+  reimplemented here.
+
 ## Tooling
 
 The standard ships with two tools so conformance is enforceable, not aspirational:

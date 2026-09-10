@@ -3,7 +3,6 @@ id: ADR-0001
 title: Idempotent ingestion keyed on reading_id
 status: accepted
 date: 2026-06-22
-normative-in: ../references/event-schema.md
 revisit-when: the bus offers exactly-once delivery at the plant edge, not only within a region
 supersedes: -
 superseded-by: -

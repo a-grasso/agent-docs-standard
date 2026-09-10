@@ -69,6 +69,56 @@ What still has to happen when work lands is **distillation**: the constraint lea
 interface fixed, the decision taken get written into the right durable class. The work's
 *state* stays where it was.
 
+### The taxonomy, and how content reaches it
+
+Every piece of knowledge has exactly one home. These are the routing rules of `SPEC.md` §7.4
+as a decision you walk top to bottom, first match wins. The spec is normative; this is the
+same thing, drawn.
+
+```mermaid
+flowchart TD
+    K(["a piece of knowledge"]) --> R1{"R1<br/>status, sequencing, ownership,<br/>or what is next?"}
+    R1 -- yes --> TR["the tracker<br/>the other substrate<br/>addressed once, by the index's tracker: key"]
+    R1 -- no --> R2{"R2<br/>an invariant, command, trap or boundary<br/>needed on most tasks in a node?"}
+    R2 -- yes --> AG["that node's AGENTS.md<br/>Purpose · Working here · Constraints<br/>Traps · Decisions in force · Principles<br/>read on every task, so ~20-200 lines"]
+    R2 -- no --> R3{"R3 / R4<br/>a decision?"}
+    R3 -- "would be re-litigated<br/>or silently reversed" --> ADR["docs/adr/<br/>NNNN-slug.md<br/>one file per decision"]
+    R3 -- "thin, cheaply reversible,<br/>or closed without commitment" --> DEC["docs/decisions/<br/>a dated, append-only log"]
+    R3 -- no --> R5{"R5<br/>a completed event?<br/>an event has no alternatives;<br/>a decision does"}
+    R5 -- yes --> REC["docs/records/<br/>YYYY-MM-DD-slug.md<br/>incidents, upgrades, migrations,<br/>benchmarks, dated audits"]
+    R5 -- no --> R6["R6 · the fitting durable class<br/>concept/ · glossary.md · references/<br/>guides/ · runbooks/ · domain/<br/>reached by pointer, loaded when relevant"]
+
+    classDef q fill:#fffbe6,stroke:#c8a415,color:#5c4a00
+    classDef tracker fill:#fdeef4,stroke:#c0397c,color:#6b1140
+    classDef ctx fill:#eaf3ff,stroke:#2f6fb5,color:#12365e
+    classDef immutable fill:#eef6ee,stroke:#3f8a4a,color:#1d4523
+    classDef mutable fill:#f3eefb,stroke:#7a4fb5,color:#33195e
+    class R1,R2,R3,R5 q
+    class TR tracker
+    class AG ctx
+    class ADR,DEC,REC immutable
+    class R6 mutable
+    class K q
+```
+
+Two properties of that picture carry most of the weight.
+
+**The substrate boundary is crossed once.** Only R1 leaves the repository, and the tracker is
+named a single time, by the project index's `tracker:` key. No individual document links a
+tracker item: a durable document outlives the work that produced it, so such a link resolves
+long after it stopped being the reason.
+
+**Time semantics follow mutability, not class-by-class taste.** Every destination in `docs/`
+is one of two kinds, and its class decides which:
+
+| | Classes | Rule |
+|---|---|---|
+| **Immutable and dated** | `adr/`, `decisions/`, `records/` | Written once, never edited. Dated by design, so time-connotated prose is admissible and expected: the reader can date every claim. |
+| **Mutable and time-neutral** | `concept/`, `glossary.md`, `references/`, `guides/`, `runbooks/`, `domain/`, and any class a project adds | Edited in place, so they describe only what is true now. §4.7 applies: no "recently", no "no longer", no narration of change. Their history is their diff. |
+
+A project adding a class **must** declare which side it falls on. That single question settles
+the class's naming, whether it may narrate history, and what invalidates it.
+
 ### 5. Topology- and tool-agnostic
 
 - **Repo topology:** the same node structure works for a **monorepo** (root anchored at

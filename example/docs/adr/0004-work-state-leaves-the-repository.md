@@ -5,7 +5,6 @@ status: accepted
 date: 2026-09-02
 supersedes: ADR-0001
 superseded-by: -
-normative-in: ../../AGENTS.md
 revisit-when: the tracker stops being the system of record for work, e.g. if issues move into
   the repository itself
 ---

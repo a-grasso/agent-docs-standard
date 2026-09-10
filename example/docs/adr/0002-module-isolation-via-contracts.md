@@ -5,7 +5,6 @@ status: accepted
 date: 2026-06-09
 supersedes: -
 superseded-by: -
-normative-in: ../../AGENTS.md
 revisit-when: a module needs a synchronous call to another module that the API cannot serve
   within its latency budget
 ---

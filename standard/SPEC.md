@@ -364,12 +364,13 @@ writing a document of that class encounters its template.
 
   | Key | Content |
   |-----|---------|
-  | `normative-in` | The mutable document that states this decision as current fact. The ADR holds the rationale; the named document holds the answer, and links back. |
   | `revisit-when` | A **checkable** condition under which the decision reopens. |
 
-- `normative-in` is what gives §7.4.2 an owner. Without it the rule against writing content
-  twice states a duty and names nobody to discharge it, so two documents may each reasonably
-  believe they own the answer, and disagree.
+- An ADR **MUST NOT** point at the document that states its decision as current fact. The link
+  runs the other way (§7.4.2). An ADR is immutable and the stating document is not, so a
+  pointer in that direction is one that goes stale where it cannot be repaired: the target is
+  renamed or absorbed, and correcting the ADR would require superseding a decision that never
+  changed.
 - `revisit-when` **MUST** state a condition a reader can evaluate. *"When cost per signal type
   is measured"* is checkable; *"when we have more data"* is not, and **MUST NOT** be used - a
   field that degrades into "revisit later" is the same as no field.
@@ -531,8 +532,15 @@ following rules **SHOULD** be applied in order; the first that matches wins.
 
 7.4.2. Content **MUST NOT** be written to two destinations. Where a second destination needs
 it, that destination **MUST** link to the first rather than restate it. Two copies of a rule
-are two rules, and they will diverge. Where two mutable documents could each reasonably state
-the same fact, the deciding ADR's `normative-in` (§7.2.1) names the one that does.
+are two rules, and they will diverge.
+
+7.4.2.1. **The link runs from the mutable document to the immutable one.** A document that
+states a decision as current fact **MUST** cite the ADR that decided it; the ADR **MUST NOT**
+cite the document (§7.2.1). Both halves of that rule earn their place. The citation lives in
+the file that changes, so it is repaired by the same commit that invalidates it, and it is an
+ordinary reference that a link checker can resolve. The reverse pointer would sit in a file
+nobody may edit. Where two mutable documents could each reasonably state the same fact,
+whichever one cites the ADR is the one that states it, and the other links to *it*.
 
 7.4.3. A rule and the prose describing it are **substitutes, not complements**. When a
 constraint gains an enforcer (§4.5.2), the prose arguing for it **SHOULD** be reduced to the
@@ -677,7 +685,6 @@ updated: 2026-07-10
 ---
 status: accepted                  # proposed | accepted | superseded | deprecated
 date: 2026-09-09
-normative-in: ../references/quota-model.md
 revisit-when: cost per signal type is measured against real traffic
 ---
 ```
@@ -698,7 +705,7 @@ conformance level under 2.0 tooling. That is a breaking change and is versioned 
 **New.** Body sections with per-section requirement levels and named enforcers (§4.5); the
 A1-A4 admissibility test (§4.6); time neutrality (§4.7); `records/`, a dated immutable class
 for events (§7.2.3); `glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3);
-routing rules R1-R6 (§7.4); the ADR fields `normative-in` and `revisit-when` (§7.2.1); the
+routing rules R1-R6 (§7.4); the ADR field `revisit-when` (§7.2.1); the
 `tracker` key, which gives the second substrate an address (§4.2, §7.3.5); a tree-wide
 scaffolding exemption (§7.1.4), generalised from the `adr/`-only carve-out of 1.0.
 

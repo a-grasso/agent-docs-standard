@@ -6,7 +6,6 @@ status: proposed            # proposed | accepted | superseded | deprecated
 date: <YYYY-MM-DD>
 supersedes: <ADR-NNNN or ->   # optional
 superseded-by: <ADR-NNNN or ->  # set when this ADR is later reversed
-normative-in: <path to the doc that states this as current fact>
 revisit-when: <a condition a reader can check>   # omitting this asserts permanence
 ---
 
@@ -35,6 +34,7 @@ same as no field. Leave it out entirely if the decision really is permanent: its
 a claim, and that is the point. A provisional decision and a settled one look identical the
 moment they are written, and an accepted ADR is immutable, so nothing else tells them apart.
 
-`normative-in` names the one mutable document allowed to state this decision as current
-fact (§7.4.2). The ADR holds the rationale; that document holds the answer and links back.
+Do not point at the document that states this decision as current fact. That document cites
+this ADR, never the reverse (§7.4.2.1): the citation belongs in the file that changes, so it
+is repaired by the commit that invalidates it.
 -->

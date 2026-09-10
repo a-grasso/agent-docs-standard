@@ -73,9 +73,10 @@ name the file to read in that repo.
 Every class in `docs/` is durable. Immutable-and-dated, or mutable-and-time-neutral (§7.1.3):
 
 - `adr/` - `NNNN-slug.md`, frontmatter `status: proposed|accepted|superseded|deprecated`.
-  Immutable once accepted; reverse via a new ADR. Also carries `normative-in:` (the doc
-  allowed to state it as current fact) and `revisit-when:` (a *checkable* reopening
-  condition; omitting it asserts permanence). It does **not** name an issue (§7.3.5.2).
+  Immutable once accepted; reverse via a new ADR. Also carries `revisit-when:` (a *checkable*
+  reopening condition; omitting it asserts permanence). It names neither an issue (§7.3.5.2)
+  nor the doc that states it as current fact: that doc cites the ADR, never the reverse
+  (§7.4.2.1).
 - `decisions/` - lightweight, dated, append-only, never edited.
 - `records/` - `YYYY-MM-DD-slug.md`. Dated, immutable records of *events*: upgrades,
   incidents, migrations, benchmark runs. An event has no alternatives; a decision does.

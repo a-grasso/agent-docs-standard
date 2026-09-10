@@ -9,7 +9,7 @@ module `AGENTS.md` cites.
 
 ## Deploy
 1. `terraform -chdir=infra plan -var-file=envs/prod.tfvars -out=plan.out`
-2. Review the plan. **Refuse** any diff that would drop or alter a telemetry table — storage is
+2. Review the plan. **Refuse** any diff that would drop or alter a telemetry table - storage is
    append-only (root ADR-0003); destructive changes need a migration ADR first.
 3. `terraform -chdir=infra apply plan.out`
 4. Deploy code: `pnpm -r --filter "./functions" --filter "./requira" --filter "./ui" deploy`.

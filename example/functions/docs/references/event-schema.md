@@ -5,7 +5,7 @@ contracts: additive changes are minor; removals/renames require a new major and 
 `ref:`/consumer.
 
 ## `telemetry.ingested` (v1)
-Published once per newly-persisted reading (idempotent — see module ADR-0001).
+Published once per newly-persisted reading (idempotent - see module ADR-0001).
 
 ```json
 {

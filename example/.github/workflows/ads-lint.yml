@@ -1,4 +1,4 @@
-# Reference CI — lint this project against the Agent Docs Standard on every push/PR.
+# Reference CI - lint this project against the Agent Docs Standard on every push/PR.
 #
 # The linter is vendored at .ads/ads-lint.py (see .ads/README.md), so this workflow is
 # self-contained: no network fetch, and pinned to the version you vendored. The linter is

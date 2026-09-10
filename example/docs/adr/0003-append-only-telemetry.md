@@ -28,4 +28,4 @@ resolve the latest correction at read time.
 - **Follow-ups:** `functions` ingestion pipeline enforces this; `requira` back-tests rely on it.
 
 ## Alternatives considered
-- **Mutable rows with an audit table** — rejected: two sources of truth, easy to desync.
+- **Mutable rows with an audit table** - rejected: two sources of truth, easy to desync.

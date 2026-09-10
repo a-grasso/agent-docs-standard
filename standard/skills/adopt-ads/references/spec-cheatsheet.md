@@ -53,12 +53,12 @@ docs: ./docs
 ```
 
 ## Pointer semantics
-- **`up`** (0..1) — parent context; module → index. Must resolve, be acyclic, and terminate at
+- **`up`** (0..1) - parent context; module → index. Must resolve, be acyclic, and terminate at
   the index. "Zoom out."
-- **`ref`** (0..n) — children (index → modules) or coupled siblings. Index should enumerate every
+- **`ref`** (0..n) - children (index → modules) or coupled siblings. Index should enumerate every
   module. "Zoom in / sideways."
-- **`dep`** (0..n) — upstream, may cross repo boundaries (git URLs, external doc URLs, sibling
-  paths). Read-only. "Go upstream." Capture only upstreams a human must reason about — not every
+- **`dep`** (0..n) - upstream, may cross repo boundaries (git URLs, external doc URLs, sibling
+  paths). Read-only. "Go upstream." Capture only upstreams a human must reason about - not every
   transitive package.
 
 Paths resolve relative to the declaring file's directory. `at` may append `#file` to a git URL to

@@ -35,5 +35,5 @@ Direct source imports across module boundaries are forbidden and enforced by an 
 - **Follow-ups:** every module's `AGENTS.md` `## Constraints` cites this ADR.
 
 ## Alternatives considered
-- **Shared internal library** — rejected: becomes a god-module and a coupling magnet.
-- **Allow imports, rely on discipline** — rejected: not enforceable, and invisible to agents.
+- **Shared internal library** - rejected: becomes a god-module and a coupling magnet.
+- **Allow imports, rely on discipline** - rejected: not enforceable, and invisible to agents.

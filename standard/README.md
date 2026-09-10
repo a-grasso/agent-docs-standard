@@ -1,6 +1,6 @@
-# The Agent Docs Standard — Vision & Design
+# The Agent Docs Standard - Vision & Design
 
-> The normative rules live in [`SPEC.md`](./SPEC.md). This document explains the *why* — the
+> The normative rules live in [`SPEC.md`](./SPEC.md). This document explains the *why* - the
 > design principles the spec encodes. Read this to understand the standard; read the spec to
 > implement it.
 
@@ -9,7 +9,7 @@
 An AI agent operating in a repository is not like a new engineer who can absorb the codebase
 over weeks. On every task it starts cold, with:
 
-1. a **finite context window** (a hard budget — every token spent on irrelevant context is a
+1. a **finite context window** (a hard budget - every token spent on irrelevant context is a
    token not spent on the task), and
 2. a **filesystem** it can read on demand.
 
@@ -30,7 +30,7 @@ find.
 ### 2. Progressive disclosure over exhaustive dumps
 
 A context file is an **entry point and a router**, not an encyclopedia. It states what the unit
-is, how to work in it, and — crucially — *where to go for more*. An agent reads a small file,
+is, how to work in it, and - crucially - *where to go for more*. An agent reads a small file,
 then follows pointers to pull deeper context only when the task demands it. The alternative (a
 giant `CLAUDE.md` that tries to say everything) fails twice: it's too big to keep in context,
 and too big to keep current.
@@ -39,11 +39,11 @@ and too big to keep current.
 
 Links between context files carry **meaning**, so an agent follows them *purposefully*:
 
-- **`up:`** answers *"what's the broader picture / the project-wide rule?"* — traverse it to
+- **`up:`** answers *"what's the broader picture / the project-wide rule?"* - traverse it to
   reach global conventions and the module map.
-- **`ref:`** answers *"where's the related area?"* — the index's `ref:` is the module map;
+- **`ref:`** answers *"where's the related area?"* - the index's `ref:` is the module map;
   a module's `ref:` names siblings it's coupled to.
-- **`dep:`** answers *"what do I build on that I don't own?"* — upstream repos and external
+- **`dep:`** answers *"what do I build on that I don't own?"* - upstream repos and external
   docs, which may live entirely outside this repository.
 
 Because the edge is typed, the agent knows *why* it's following a link and *what shape* of
@@ -74,8 +74,8 @@ interface fixed, the decision taken get written into the right durable class. Th
 - **Repo topology:** the same node structure works for a **monorepo** (root anchored at
   `.git`, modules are subdirectories) and a **polyrepo** (root is a local workdir, modules are
   separate repos, `dep:` pointers become git URLs). The pointer graph spans repo boundaries by
-  design — that's what `dep:` is for.
-- **Agent tool:** `AGENTS.md` is the canonical file — ADS is a *profile* of the
+  design - that's what `dep:` is for.
+- **Agent tool:** `AGENTS.md` is the canonical file - ADS is a *profile* of the
   [AGENTS.md](https://agents.md) convention (governed by the Linux Foundation's Agentic AI
   Foundation), adding only what it deliberately leaves unspecified. `CLAUDE.md` is an alias
   (a symlink) so Claude Code and other tools each find a file under the name they look for,
@@ -91,7 +91,7 @@ A tree (index → modules) captures ownership, but real dependencies aren't a tr
 
 `up:`/`ref:` give you the ownership tree; `dep:` adds the **cross-cutting edges** that turn it
 into the graph that actually describes the system. An agent asked *"is it safe to change this
-API call?"* follows `dep:` to the upstream doc — a question a pure tree can't answer.
+API call?"* follows `dep:` to the upstream doc - a question a pure tree can't answer.
 
 ## What an agent actually does with this
 
@@ -124,9 +124,9 @@ current hop of the graph.
 
 The standard ships with two tools so conformance is enforceable, not aspirational:
 
-- **[`tools/ads-lint.py`](./tools/ads-lint.py)** — a zero-dependency linter that checks a project
+- **[`tools/ads-lint.py`](./tools/ads-lint.py)** - a zero-dependency linter that checks a project
   against `SPEC.md` and reports its conformance level (§9). See [`tools/README.md`](./tools/README.md).
-- **[`skills/adopt-ads/`](./skills/adopt-ads/)** — a Claude Code skill that adopts/retrofits the
+- **[`skills/adopt-ads/`](./skills/adopt-ads/)** - a Claude Code skill that adopts/retrofits the
   standard in a repository, interrogating for dependency pointers and verifying with the linter.
 
 ## Next

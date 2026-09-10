@@ -1,7 +1,7 @@
 # CenterSight (example)
 
 This is a **fictional** project included to demonstrate the [Agent Docs Standard](../standard/).
-It is documentation-complete but only lightly stubbed in code — the point is the *shape* of the
+It is documentation-complete but only lightly stubbed in code - the point is the *shape* of the
 docs, not a runnable app.
 
 **To explore it the way an agent would, start at [`AGENTS.md`](./AGENTS.md)** and follow the

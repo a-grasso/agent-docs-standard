@@ -29,5 +29,5 @@ first successful insert.
 - **Follow-ups:** the dedupe index is provisioned in `infra`.
 
 ## Alternatives considered
-- **Best-effort dedupe by (sensor, timestamp)** — rejected: two distinct readings can share a
+- **Best-effort dedupe by (sensor, timestamp)** - rejected: two distinct readings can share a
   millisecond; would silently drop data.

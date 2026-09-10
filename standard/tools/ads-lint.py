@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""ads-lint — conformance linter for the Agent Docs Standard (ADS).
+"""ads-lint - conformance linter for the Agent Docs Standard (ADS).
 
 Validates a project tree against standard/SPEC.md: frontmatter schema, the
 up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy and its class
@@ -60,7 +60,7 @@ class Finding:
     rule: str          # spec section, e.g. "§5.1"
     path: str          # repo-relative file/dir the finding concerns
     msg: str
-    gate: str = ""     # "L1" | "L2" | "L3" — which level this blocks (optional)
+    gate: str = ""     # "L1" | "L2" | "L3" - which level this blocks (optional)
 
 
 # --------------------------------------------------------------------------- #
@@ -706,7 +706,7 @@ def report_text(findings, level, note, use_color):
     ni = sum(f.level == INFO for f in findings)
     print(f"\n{len(findings)} finding(s): {ne} error, {nw} warn, {ni} info")
     print(f"conformance: {c(ERROR if level=='none' else WARN if level!='L3' else INFO)}"
-          f"{level}{c('reset')} — {note}")
+          f"{level}{c('reset')} - {note}")
 
 
 def main(argv=None):

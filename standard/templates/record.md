@@ -1,7 +1,8 @@
 ---
 # File name: YYYY-MM-DD-slug.md  (e.g. 2026-09-09-collector-0.155-to-0.156.md)
 # The date is the filename's job (§7.2.3): the class sorts chronologically and every
-# document in it is dated by construction.
+# document in it is dated by construction. Use the date the EVENT happened, not the
+# date you are writing this up.
 title: <what happened, e.g. "Collector upgrade 0.155 to 0.156">
 ---
 

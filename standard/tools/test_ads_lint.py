@@ -383,7 +383,14 @@ class StatusBelongsToTheTracker(DocsCase):
         found = for_file(self.lint(), "rollout.md")
         self.assertEqual(len(found), 1, msgs(found))
         self.assertEqual(found[0].rule, "§7.3.2")
-        self.assertEqual(found[0].gate, "L3")
+        self.assertEqual(found[0].gate, "",
+                         "§9 places §7.3 outside the conformance levels, so the "
+                         "substrate check must report without gating one")
+
+    def test_yaml_null_status_is_not_a_status(self):
+        """`~` is a null. Findings must not depend on which parser is installed."""
+        self.doc("guides/a.md", "---\nstatus: ~\n---\n\n# A\n\nText.\n")
+        self.assertEqual(for_file(self.lint(), "a.md"), [])
 
     def test_adr_status_is_exempt(self):
         """An ADR's status is the decision's lifecycle, not a work report."""
@@ -433,3 +440,159 @@ class SizeFloor(DocsCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class RootMustBeANode(unittest.TestCase):
+    """§3.1/§6.2: --root is the project index, not "wherever a node turns up".
+
+    Without this the walk adopts any conformant subtree and reports it as the
+    whole project, so a non-conformant root passes with a clean bill of health.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp, True)
+
+    def lint(self):
+        args = argparse.Namespace(root=self.tmp, max_lines=200, min_lines=20,
+                                  check_remote=False)
+        return ads_lint.Linter(self.tmp, args).run()
+
+    def test_conformant_subtree_does_not_certify_the_root(self):
+        _write(os.path.join(self.tmp, "example", "AGENTS.md"), INDEX_AGENTS)
+        found = [f for f in self.lint() if f.rule == "§3.1"]
+        self.assertTrue(found, "a root with no AGENTS.md must be an error")
+        self.assertEqual(found[0].level, ads_lint.ERROR)
+        self.assertEqual(ads_lint.conformance(self.lint())[0], "none")
+
+    def test_root_with_a_node_is_fine(self):
+        _write(os.path.join(self.tmp, "AGENTS.md"), INDEX_AGENTS)
+        self.assertEqual([f for f in self.lint() if f.rule == "§3.1"], [])
+
+
+class ClassRulesBindDocsOnly(DocsCase):
+    """§7.1.4 is scoped "Within `docs/`" - source folders are not classes."""
+
+    def test_adr_named_source_folder_is_not_an_adr_class(self):
+        _write(os.path.join(self.root, "src", "adr", "notes.md"), "# notes\n")
+        _write(os.path.join(self.root, "src", "adr", "README.md"), "# readme\n")
+        self.assertEqual(for_file(self.lint(), "notes.md"), [])
+        self.assertEqual(for_file(self.lint(), "README.md"), [])
+
+    def test_records_named_source_folder_is_not_a_records_class(self):
+        _write(os.path.join(self.root, "pkg", "records", "store.md"), "# store\n")
+        self.assertEqual(for_file(self.lint(), "store.md"), [])
+
+
+class RecordDatesAreReal(DocsCase):
+    """§7.2.3: the date is the filename's job, so it has to be a date."""
+
+    def test_impossible_date_is_reported(self):
+        self.doc("records/2026-99-99-x.md", "# x\n")
+        found = for_file(self.lint(), "2026-99-99-x.md")
+        self.assertTrue(found, "99-99 is not a calendar date")
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+    def test_real_date_passes(self):
+        self.doc("records/2026-08-14-bus-partition.md", "# incident\n")
+        self.assertEqual(for_file(self.lint(), "2026-08-14-bus-partition.md"), [])
+
+
+class TimeNeutralityReporting(DocsCase):
+    """§4.7.1 in a mutable class (§7.1.3)."""
+
+    def test_every_term_on_a_line_is_reported(self):
+        self.doc("guides/g.md",
+                 "# G\n\nWe recently moved and previously it was formerly fine.\n")
+        found = for_file(self.lint(), "g.md")
+        self.assertTrue(found)
+        self.assertIn("recently", found[0].msg)
+        self.assertIn("previously", found[0].msg)
+        self.assertIn("formerly", found[0].msg)
+
+    def test_fenced_code_is_not_prose(self):
+        self.doc("guides/h.md",
+                 "# H\n\n```sh\n# TODO: currently broken\n```\n\nStable text.\n")
+        self.assertEqual(for_file(self.lint(), "h.md"), [])
+
+
+class SizeFloorCountsTheBody(unittest.TestCase):
+    """§3.4.1 says "body", so pointer-heavy frontmatter must not mask an empty one."""
+
+    def test_long_frontmatter_does_not_clear_the_floor(self):
+        refs = "\n".join(f"  - m{i}/AGENTS.md" for i in range(20))
+        text = f"---\nkind: project-index\ntopology: monorepo\nref:\n{refs}\n---\n\n# P\n"
+        self.assertLess(ads_lint.body_line_count(text), 20)
+        self.assertGreater(len(text.splitlines()), 20)
+
+
+class BomDoesNotBreakFrontmatter(unittest.TestCase):
+    """A byte-order mark must not read as "no frontmatter"."""
+
+    def test_bom_prefixed_frontmatter_parses(self):
+        fm, _ = ads_lint.split_frontmatter("\ufeff---\nkind: module\n---\n\n# M\n")
+        self.assertIsNotNone(fm)
+        self.assertIn("kind: module", fm)
+
+
+class TrackerIsAddressedOnce(unittest.TestCase):
+    """§7.3.5. A standard built on typed pointers cannot leave its second
+    substrate unaddressed, and it is a project property, so it appears once."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp, True)
+
+    def lint(self):
+        args = argparse.Namespace(root=self.tmp, max_lines=200, min_lines=0,
+                                  check_remote=False)
+        return ads_lint.Linter(self.tmp, args).run()
+
+    def _index(self, extra=""):
+        _write(os.path.join(self.tmp, "AGENTS.md"),
+               "---\nkind: project-index\ntopology: monorepo\n" + extra + "---\n\n# P\n")
+
+    def _t(self):
+        return [f for f in self.lint() if f.rule.startswith("\u00a77.3.5")]
+
+    def test_missing_tracker_is_reported(self):
+        self._index()
+        self.assertTrue(self._t(), "an index with no tracker should be reported")
+
+    def test_url_tracker_passes(self):
+        self._index("tracker:\n  at: https://github.com/acme/p/issues\n  kind: github\n")
+        self.assertEqual(self._t(), [], msgs(self.lint()))
+
+    def test_org_repo_tracker_passes(self):
+        self._index("tracker:\n  at: acme/platform\n")
+        self.assertEqual(self._t(), [], msgs(self.lint()))
+
+    def test_nonsense_target_is_reported(self):
+        self._index("tracker:\n  at: somewhere\n")
+        self.assertTrue(self._t())
+
+    def test_tracker_never_gates_a_level(self):
+        """\u00a79 keeps the substrate rule out of the conformance levels."""
+        self._index()
+        self.assertTrue(all(f.gate == "" for f in self._t()))
+
+    def test_module_must_not_declare_one(self):
+        self._index("tracker:\n  at: acme/p\nref:\n  - m/AGENTS.md\n")
+        _write(os.path.join(self.tmp, "m", "AGENTS.md"),
+               "---\nkind: module\nup: ../AGENTS.md\ntracker:\n  at: acme/p\n---\n\n# M\n")
+        self.assertTrue([f for f in self.lint() if f.rule == "\u00a77.3.5.1"])
+
+
+class FallbackParserHandlesNestedMaps(unittest.TestCase):
+    """The built-in parser must accept what PyYAML accepts, or a project's
+    findings depend on whether PyYAML happens to be installed."""
+
+    def test_nested_block_mapping(self):
+        d = ads_lint._minimal_parse(
+            "kind: project-index\ntracker:\n  at: acme/p\n  kind: github\ndocs: ./docs\n")
+        self.assertEqual(d["tracker"], {"at": "acme/p", "kind": "github"})
+        self.assertEqual(d["docs"], "./docs")
+
+    def test_block_sequence_still_works(self):
+        d = ads_lint._minimal_parse("ref:\n  - { at: a/AGENTS.md }\n  - b/AGENTS.md\n")
+        self.assertEqual(d["ref"], [{"at": "a/AGENTS.md"}, "b/AGENTS.md"])

@@ -14,8 +14,8 @@ Run it locally:
 python3 .ads/ads-lint.py --root . --strict
 ```
 
-CI runs the same command on every push/PR via
-[`../.github/workflows/ads-lint.yml`](../.github/workflows/ads-lint.yml).
+[`../.github/workflows/ads-lint.yml`](../.github/workflows/ads-lint.yml) is a reference
+workflow that runs the same command; copy it to your repository root to have CI run it.
 
 **Updating (real adoptions):** re-copy the canonical `ads-lint.py` over this file when the
 standard's tooling changes. (The linter is skipped by its own scan - `.ads/` is a

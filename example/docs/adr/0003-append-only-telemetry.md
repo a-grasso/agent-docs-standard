@@ -3,7 +3,6 @@ id: ADR-0003
 title: Telemetry storage is append-only
 status: accepted
 date: 2026-06-15
-decides: centersight/platform#94
 normative-in: ../../functions/docs/references/event-schema.md
 supersedes: -
 superseded-by: -

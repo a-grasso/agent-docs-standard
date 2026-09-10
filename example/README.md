@@ -34,8 +34,17 @@ and `## Principles` appears only on the index, where §4.5.5 confines it. A node
 sections it has something to say in.
 
 There is no `plans/` or `reviews/` here. Work in flight lives in the issue tracker, which is
-the other substrate (§7.3): the ADRs name the issues they close via `decides:`.
+the other substrate (§7.3) and is addressed once, by the `tracker` key on the project index
+(§7.3.5). No document here links an issue.
 
-This example claims **Level 3** conformance (see standard §9) and is **CI-verified**:
-[`.github/workflows/ads-lint.yml`](./.github/workflows/ads-lint.yml) runs the vendored linter
-(`.ads/ads-lint.py`) with `--strict` on every push and PR.
+This example claims **Level 3** conformance (see standard §9), verified by running the vendored
+linter over it: `python3 .ads/ads-lint.py --root . --strict` reports zero findings.
+[`.github/workflows/ads-lint.yml`](./.github/workflows/ads-lint.yml) is a **reference workflow**
+to copy into a real adoption. It does not run here: GitHub only reads workflows from
+`.github/workflows/` at a repository root, and this example is a subdirectory.
+
+> **On dates in this example.** CenterSight is fiction, authored as a single set. Its ADR dates
+> and `updated:` fields position the documents relative to each other; they are not a record of
+> when anything was really accepted. §7.2.1's rule that an accepted ADR must not be edited binds
+> real projects, where acceptance is an event with witnesses. Do not read edits to this
+> example's ADRs as a demonstration that editing accepted ADRs is allowed.

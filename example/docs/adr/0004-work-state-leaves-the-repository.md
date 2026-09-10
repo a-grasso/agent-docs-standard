@@ -5,7 +5,6 @@ status: accepted
 date: 2026-09-02
 supersedes: ADR-0001
 superseded-by: -
-decides: centersight/platform#402
 normative-in: ../../AGENTS.md
 revisit-when: the tracker stops being the system of record for work, e.g. if issues move into
   the repository itself
@@ -15,7 +14,7 @@ revisit-when: the tracker stops being the system of record for work, e.g. if iss
 
 ## Context
 ADR-0001 adopted the Agent Docs Standard and put feature work in per-module `docs/plans/` and
-`docs/reviews/`. Two years of that produced the failure it was meant to prevent. The
+`docs/reviews/`. Three months of that produced the failure it was meant to prevent. The
 throttling plan under `requira/docs/plans/` sat at `status: active` for two months after the
 feature shipped. The review beside it recorded conclusions that had since been reversed. Both
 read as current to any agent that loaded them, and nothing in the repository could tell that
@@ -36,8 +35,16 @@ What a completed piece of work established is still written down: a constraint l
 to the owning node's `## Constraints`, a decision to an ADR or the decision log, an event to
 `docs/records/`. What does not get written down is the work's state.
 
-Each ADR now names the issue it closes in `decides:`, so the audit trail crosses the boundary
-in both directions.
+The tracker is named once, by the project index's `tracker` key, and nowhere else. No document
+links an individual issue: a decision record outlives the work that produced it, so a pointer
+to that work would resolve long after it stopped being the reason.
+
+**What this does not reverse.** ADR-0001 decided three things: to adopt the standard, to run as
+a monorepo, and to keep feature work in `plans/`/`reviews/`. Only the third is reversed here.
+The first two remain in force, and this ADR carries them forward: the standard stays adopted and
+the topology stays `monorepo`. Supersession is whole-document, so ADR-0001's status had to
+change even though most of it still stands - which is the cost of recording three decisions in
+one record.
 
 ## Consequences
 - **Positive:** no document in the repository can go stale by describing work that has moved

@@ -55,7 +55,16 @@ Read `references/spec-cheatsheet.md` before scaffolding if you need the exact fr
 for t in git rg grep python3 gh glab jq; do
   if command -v "$t" >/dev/null 2>&1; then echo "$t: $(command -v "$t")"; else echo "$t: MISSING"; fi
 done
+gh auth status 2>&1 | head -3 || true      # present but unauthenticated still degrades Phase 4
 ```
+
+3. **Tracker check.** Ask which issue tracker the project uses, and capture its URL or
+   `org/repo`. The standard makes it the second substrate (§7.3): status, sequencing and what is
+   next live there and nowhere in the repository. A project with no tracker **MUST NOT**
+   conclude that `docs/` will do (§7.3.4) - if there is none, say so plainly in the handoff and
+   do not invent a home for work state. Record it **once**, as the `tracker` key on the project
+   index (§7.3.5). Do not link tracker items from individual documents: that is forbidden
+   (§7.3.5.2), because a durable document outlives the work that produced it.
 
 | Tool | Used for | If missing |
 |------|----------|-----------|
@@ -178,10 +187,22 @@ say under, and delete the guidance comment at the top once the file is real.
    Markdown link is **not** loaded; never duplicate content.)
 5. **docs/ skeleton** at the root (and per module where it earns it): `docs/adr/` and
    `docs/decisions/`. Create `docs/records/`, `docs/glossary.md` and `docs/concept/` when the
-   project has something to put in them, not before. There is no `plans/` or `reviews/`
-   class: work in flight belongs to the issue tracker (§7.3). If the repo already has
-   roadmap, backlog, open-question or bug-list documents, say so in the handoff and propose
-   moving them to the tracker - do not silently keep them.
+   project has something to put in them, not before. Ask, rather than assuming there is
+   nothing: a recent migration, upgrade or incident is a `records/` entry; a term the team
+   argues about is a `glossary.md` entry; a design argument someone keeps re-making belongs in
+   `concept/`. There is no `plans/` or `reviews/` class: work in flight belongs to the issue
+   tracker (§7.3). If the repo already has roadmap, backlog, open-question or bug-list
+   documents, say so in the handoff and propose moving them to the tracker - do not silently
+   keep them.
+
+   **Migrating a 1.0 tree.** If `docs/plans/`, `docs/reviews/` or `docs/archive/` exist, apply
+   SPEC Appendix C and show the user each move before making it: open plan and review content
+   goes to the tracker, and what a completed piece of work established is distilled into the
+   right durable class (a constraint learned to the node's `## Constraints`, a decision to
+   `adr/` or `decisions/`, a completed event to `records/`) before the file is deleted. Anything
+   in `archive/` that records a completed event moves to `records/`, renamed
+   `YYYY-MM-DD-slug.md`; the remainder is deleted. Nothing in the tooling reports a leftover
+   `archive/`, so this is on you.
 6. **Seed ADR-0001** at `docs/adr/0001-adopt-agent-docs-standard.md` from `adr.md`, recording the
    decision to adopt ADS and the chosen topology. This is both useful and a worked example of
    the durable record.
@@ -202,13 +223,28 @@ say under, and delete the guidance comment at the top once the file is real.
 Run the linter and drive it to clean:
 
 ```bash
-python3 <assets>/ads-lint.py --root <root>            # or --json for detail
+python3 <assets>/ads-lint.py --root <root> --strict    # or --json for detail
 ```
 
-Fix every **error** and every **L2/L3-gated warn** you reasonably can (broken pointers, missing
-aliases, un-enumerated modules, malformed docs). Remaining warns that need human input (an
-unknown dep URL, a size-budget trim) go into the handoff. Re-run until the reported
-conformance level is as high as the inputs allow.
+Use `--strict`. Without it the command exits 0 while warnings stand, and the checks for the
+clauses §9 leaves uncertified (§7.3.2 substrates, §4.7 time neutrality) are ungated, so they
+never move the reported level either - they would pass unnoticed twice over.
+
+Fix every **error** and every **warn** you reasonably can, gated or not (broken pointers,
+missing aliases, un-enumerated modules, malformed docs, a durable doc declaring `status:`).
+Remaining warns that need human input (an unknown dep URL, a size-budget trim) go into the
+handoff. Re-run until the reported conformance level is as high as the inputs allow.
+
+Two things the linter cannot see, so check them by hand before reporting success:
+
+- **Placeholder text in scaffolded docs.** There is no filename or content check for
+  `docs/decisions/`, so a half-filled `decision.md` lints clean. Re-read anything you scaffolded
+  and delete what the project could not fill (§4.5.1).
+- **A `docs/archive/` left over from 1.0.** Nothing reports it. See Phase 5.5.
+
+An `INFO §3.4.1` finding on a small module is **advisory and gates nothing**. If the node
+honestly has only a purpose and its commands, leave it short. Padding it to clear the floor
+produces exactly the uniform, heading-filled outcome §4.5.3 forbids.
 
 ## Phase 7 - Handoff
 

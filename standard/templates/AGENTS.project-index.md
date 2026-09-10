@@ -7,6 +7,10 @@ ref:                          # the module map: list every module
   - { at: <module-b>/AGENTS.md, hint: <one line: what it is> }
 dep:                          # upstream you build on but do not own (repos, external docs)
   - { id: <dep-id>, at: <path | git URL#file | https URL>, kind: repo, hint: <what and why> }
+tracker:
+  at: <URL or org/repo where work state lives - the second substrate (SPEC 7.3.5)>
+  kind: <github | gitlab | jira | linear | other>
+  hint: <one line. Delete this key only if the project genuinely has no tracker.>
 docs: ./docs
 updated: <YYYY-MM-DD>
 ---

@@ -7,7 +7,7 @@ ref:
 dep:
   - { id: centersight-api, at: https://centersight-api-doc.com, kind: external-doc, hint: REST contract we serve for alert dispatch }
 docs: ./docs
-updated: 2026-07-10
+updated: 2026-09-10
 ---
 
 # functions

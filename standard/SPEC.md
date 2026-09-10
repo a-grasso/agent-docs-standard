@@ -1,6 +1,6 @@
 # Agent Docs Standard (ADS) - Specification
 
-**Version:** 1.1
+**Version:** 2.0
 **Status:** Draft
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHOULD**, **SHOULD NOT**,
@@ -28,7 +28,7 @@ It is deliberately silent on programming language, build system, and directory n
 ADS is a **profile of [AGENTS.md](https://agents.md)**, not a competing convention. The
 context file is a standard `AGENTS.md` exactly as existing tools consume it (a plain-Markdown
 file, nearest-file precedence); everything this specification adds - the frontmatter, the
-pointer graph, the `docs/` taxonomy, the lifecycle - layers on top of what AGENTS.md
+pointer graph, the `docs/` taxonomy, the substrate split - layers on top of what AGENTS.md
 deliberately leaves unspecified. Every ADS-conformant project is a valid AGENTS.md project.
 
 ---
@@ -98,6 +98,7 @@ the file.
 | `dep` | list of dep-pointers | OPTIONAL | Upstream dependencies (§5.3). |
 | `topology` | enum | **REQUIRED** on `project-index`; **MUST NOT** appear on `module` | `monorepo` or `polyrepo` (§6.3). |
 | `docs` | path | OPTIONAL | Location of this node's docs folder; defaults to `./docs`. |
+| `tracker` | tracker | **RECOMMENDED** on `project-index`; **MUST NOT** appear on `module` | Where work state lives (§7.3.5). |
 | `updated` | date | OPTIONAL | ISO-8601 date the file was last meaningfully changed. |
 
 4.3. **Exactly one** node in a reachable graph **MUST** have `kind: project-index`. It is the
@@ -135,7 +136,7 @@ nodes described, and that is how derivable filler (§4.6.3) enters a project at 
 4.5.4. Off-repo context is carried by `dep` pointers (§5.3), **not** by a body section. Prose
 that lists or narrates dependencies duplicates machine-readable frontmatter and is
 inadmissible under §4.6.3. Where a pointer needs a one-line description of what lives at the
-other end, that description belongs in the pointer's `hint` (§5.2.4), not in the body.
+other end, that description belongs in the pointer's `hint` (§5.3.2), not in the body.
 
 4.5.5. **Principles.** `## Principles` **MUST NOT** appear on a `module` node. A principle
 that holds for only part of a project is a constraint (§4.5.2) and belongs beside its enforcer;
@@ -348,7 +349,7 @@ a decision is an ADR; the history of an event is a record.
 name begins with `_` (e.g. `_template.md`) is **scaffolding**: a file that helps an author
 write records, rather than a record itself. Class naming, frontmatter and lifecycle rules apply
 to records only. Scaffolding **SHOULD** sit inside the class it serves, so that an author
-writing a document of that class encounters its template (§7.4.4).
+writing a document of that class encounters its template.
 
 ### 7.2 Document classes
 
@@ -363,7 +364,6 @@ writing a document of that class encounters its template (§7.4.4).
 
   | Key | Content |
   |-----|---------|
-  | `decides` | The issue this ADR closes (§7.3.5). The audit trail across the substrate boundary. |
   | `normative-in` | The mutable document that states this decision as current fact. The ADR holds the rationale; the named document holds the answer, and links back. |
   | `revisit-when` | A **checkable** condition under which the decision reopens. |
 
@@ -465,6 +465,12 @@ context file. They belong to the tracker. This covers roadmaps, phasing, risk re
 open-question lists, bug lists, feature backlogs, and any statement of how far a piece of work
 has got.
 
+> **The `status:` of an ADR is exempt** (§7.2.1), and is the only exemption. That field reports
+> a decision's own lifecycle - whether the project is bound by it - and not how far any work has
+> got. It is invalidated by a superseding ADR, which is an event in the repository that a reader
+> can see, so it has the observer §7.3.3 requires. Conformance tooling **MUST NOT** report an
+> ADR's `status:` as a §7.3.2 finding.
+
 7.3.3. Rationale: the two substrates differ in **what invalidates them**. A tracker item is
 invalidated by work happening, and the tracker is the thing that observes work happening. A
 document has no such observer, so a document that states status has no invalidation event its
@@ -476,9 +482,32 @@ one level up.
 pull-request queue. A project without one has nowhere to keep work state; it **MUST NOT**
 conclude that `docs/` will do.
 
-7.3.5. The substrates reference each other once per decision: an ADR names the issue it closes
-(`decides`, §7.2.1), and the issue links the durable document once one exists. *"Was this ever
-decided?"* is then answerable from either side.
+7.3.5. **The tracker is addressed once, at the project index.** A standard whose whole method is
+typed, explicit pointers cannot leave its second substrate unaddressed: §8.3 sends an agent to
+the tracker, so the tracker needs a location. The `tracker` key (§4.2) carries it:
+
+```yaml
+tracker:
+  at: https://github.com/acme/platform/issues   # URL or org/repo    (REQUIRED)
+  kind: github                                  # github | gitlab | jira | linear | other
+  hint: work state, one project board           # one line           (RECOMMENDED)
+```
+
+7.3.5.1. `tracker` appears **exactly once** in a project, on the `project-index`, for the same
+reason `topology` does (§4.2): it is a property of the project, not of a node. A module
+**MUST NOT** declare one.
+
+7.3.5.2. **No document names an issue.** Individual documents **MUST NOT** carry a pointer to a
+tracker item, singly or as a list. A durable document outlives the work that produced it, so a
+link to that work is a pointer whose target stops being relevant while remaining resolvable: it
+invites a reader to reconstruct a decision from a closed ticket rather than from the record in
+front of them. The substrate boundary is crossed once, at the project level, and not once per
+document.
+
+7.3.5.3. The consequence is deliberate: *"which issue closed this?"* is **not** answerable from
+the repository. *"Why is it like this?"* is, and that is the question the repository exists to
+answer (§7.3.1). A project wanting the audit trail can keep it where the invalidation lives, by
+having the issue link the durable document.
 
 7.3.6. A document is **not** disqualified by having been produced *from* work. Distilling what
 a completed piece of work established - a constraint learned, an interface fixed, a decision
@@ -552,7 +581,7 @@ unrelated modules.
 | *why* is it built this way | nearest `docs/adr/` then `docs/decisions/` |
 | what happened during an upgrade, incident, or migration | nearest `docs/records/` |
 | what a domain term means | the project index's `docs/glossary.md` |
-| current state of feature *F* | the issue tracker (§7.3), never `docs/` |
+| current state of feature *F* | the project index's `tracker` (§7.3.5), never `docs/` |
 
 8.4. **Respect constraints.** Before changing a node, read its `## Constraints` and the ADRs it
 cites. An `accepted` ADR is binding (§7.2.1).
@@ -621,6 +650,10 @@ ref:
   - { at: web/AGENTS.md,          hint: web client }
 dep:
   - { id: shared-ui, at: git@github.com:acme/shared-ui.git#AGENTS.md, kind: repo, hint: design system }
+tracker:
+  at: https://github.com/acme/platform/issues
+  kind: github
+  hint: work state; nothing here states status
 docs: ./docs
 updated: 2026-07-10
 ---
@@ -644,7 +677,6 @@ updated: 2026-07-10
 ---
 status: accepted                  # proposed | accepted | superseded | deprecated
 date: 2026-09-09
-decides: acme/platform#412        # the issue this closes
 normative-in: ../references/quota-model.md
 revisit-when: cost per signal type is measured against real traffic
 ---
@@ -654,19 +686,24 @@ See [`templates/`](./templates/) for full, copy-ready files.
 
 ---
 
-## Appendix C - What changed in 1.1
+## Appendix C - What changed in 2.0
 
-1.1 adds the content half of the standard: 1.0 governed where context files live and how they
+2.0 adds the content half of the standard: 1.0 governed where context files live and how they
 link, and said almost nothing about what they contain.
+
+The major version is deliberate. Two document classes are removed, a documented
+linter flag is gone, and a 1.0 project that used the ephemeral classes loses a
+conformance level under 2.0 tooling. That is a breaking change and is versioned as one.
 
 **New.** Body sections with per-section requirement levels and named enforcers (§4.5); the
 A1-A4 admissibility test (§4.6); time neutrality (§4.7); `records/`, a dated immutable class
 for events (§7.2.3); `glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3);
-routing rules R1-R6 (§7.4); the ADR fields `decides`, `normative-in` and `revisit-when`
-(§7.2.1); a tree-wide scaffolding exemption (§7.1.4), generalised from the `adr/`-only carve-out
-of 1.0.
+routing rules R1-R6 (§7.4); the ADR fields `normative-in` and `revisit-when` (§7.2.1); the
+`tracker` key, which gives the second substrate an address (§4.2, §7.3.5); a tree-wide
+scaffolding exemption (§7.1.4), generalised from the `adr/`-only carve-out of 1.0.
 
-**Removed.** The ephemeral classes `plans/` and `reviews/`, their filename grammar and
+**Removed.** Per-document issue links: no document names a tracker item, and the ADR field
+`decides` is gone with that rule (§7.3.5.2). The ephemeral classes `plans/` and `reviews/`, their filename grammar and
 `status`/`feature` frontmatter, the distillation-and-garbage-collection lifecycle, and
 `docs/archive/`. An ephemeral document is required to state its own status, which §7.3 assigns
 to the tracker; the lifecycle existed to compensate for the fact that nothing invalidates such
@@ -675,6 +712,17 @@ a document, and a tracker provides that for free. What survives is the distillat
 
 **Migrating from 1.0.** Move open `plans/` and `reviews/` content to the tracker; distil the
 rest and delete the files. Move anything in `docs/archive/` that records a completed event to
-`records/`, renamed `YYYY-MM-DD-slug.md`; delete the remainder. Section §7.5 is now §7.4, and
-the class list §7.2.3 of 1.0 is now §7.2.6. Levels are unaffected: an L2 project stays L2, and
-L3's ephemeral-lifecycle clause is simply gone.
+`records/`, renamed `YYYY-MM-DD-slug.md`; delete the remainder. Renumbering: 1.0's section 7.5
+is 2.0's §7.4, and 1.0's section 7.2.3 class list is 2.0's §7.2.6. (Historical numbers are
+written without the section sign, so that a mechanical reference check over this document
+resolves every `§` it finds.)
+
+**Effect on conformance levels.** An L1 or L2 project is unaffected and keeps its level. **An
+L3 project that used the ephemeral classes regresses to L2 until it migrates**: every 1.0 plan
+and review declares its own `status:`, which §7.3.2 now reports, and that finding gates L3. The
+regression is the migration signal, and it clears the moment the files are gone. L3's
+ephemeral-lifecycle clause is simply gone.
+
+**Tooling.** `ads-lint`'s `--stale-days` flag is removed, along with the staleness clock it
+served. A 1.0 invocation that passes it is accepted and ignored, with a deprecation notice, so
+an existing CI job does not break on upgrade.

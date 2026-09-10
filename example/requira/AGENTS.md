@@ -5,13 +5,13 @@ up: ../AGENTS.md
 ref:
   - { at: ../functions/AGENTS.md, hint: source of telemetry.ingested events; owns alert dispatch }
 docs: ./docs
-updated: 2026-07-10
+updated: 2026-09-10
 ---
 
 # requira
 
 ## Purpose
-The rule engine ("requirements/rules"). Subscribes to `telemetry.ingested` events, evaluates
+The rule engine. Subscribes to `telemetry.ingested` events, evaluates
 operator-defined alert rules against readings, and raises alerts (dispatched by `functions`).
 Also back-tests rules against historical telemetry.
 
@@ -32,6 +32,7 @@ Also back-tests rules against historical telemetry.
 - Alerts are raised here and dispatched by `functions`; this module never delivers
   (root ADR-0002).
 - Suppression state is passed into the evaluator and persisted by the engine loop, never read
-  inside the evaluator: that is what keeps throttling compatible with ADR-0001.
+  inside the evaluator: that is what keeps throttling compatible with purity
+  (decision log, 2026-08-30).
 - A cleared-then-refired condition re-alerts immediately rather than waiting out the cooldown
   (decision log, 2026-08-30).

@@ -20,7 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # --strict also fails on warnings (stale ephemeral docs, missing aliases, size budget).
+      # --strict also fails on warnings (missing aliases, size budget, docs/ class rules,
+      # and the substrate check of SPEC §7.3.2).
       # Drop --strict to gate on errors only.
       - name: Lint docs against the Agent Docs Standard
         run: python3 .ads/ads-lint.py --root . --strict

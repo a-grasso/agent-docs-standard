@@ -26,6 +26,7 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
+from datetime import date
 
 ERROR, WARN, INFO = "error", "warn", "info"
 SKIP_DIRS = {"node_modules", "dist", "build", "target", "vendor", ".venv", "__pycache__"}
@@ -66,9 +67,17 @@ class Finding:
 # --------------------------------------------------------------------------- #
 # Frontmatter parsing
 # --------------------------------------------------------------------------- #
+def body_line_count(text):
+    """§3.4.1 counts the *body*, not the file: frontmatter is not content."""
+    fm_text, total = split_frontmatter(text)
+    if fm_text is None:
+        return total
+    return len(text[text.index(fm_text) + len(fm_text):].splitlines())
+
+
 def split_frontmatter(text):
     """Return (frontmatter_text_or_None, total_line_count)."""
-    lines = text.splitlines()
+    lines = text.lstrip("\ufeff").splitlines()
     if not lines or lines[0].strip() != "---":
         return None, len(lines)
     for i in range(1, len(lines)):
@@ -191,8 +200,32 @@ def _minimal_parse(fm_text):
             data[key] = _parse_flow_seq(val) if val.startswith("[") else _unquote(val)
             i += 1
             continue
-        # Block value follows.
+        # Block value follows: either a sequence of `- ` items, or a nested
+        # block mapping (`tracker:` then indented `at:`/`kind:`), which §7.3.5
+        # uses and which PyYAML accepts, so the fallback must accept it too.
         i += 1
+        j = i
+        while j < n and not _strip_comment(lines[j]).strip():
+            j += 1
+        if j < n:
+            raw = _strip_comment(lines[j])
+            first, first_ind = raw.strip(), len(raw) - len(raw.lstrip())
+            if first_ind > 0 and not first.startswith("- ") and ":" in first:
+                d, i = {}, j
+                while i < n:
+                    l2 = _strip_comment(lines[i])
+                    if not l2.strip():
+                        i += 1
+                        continue
+                    s2 = l2.strip()
+                    if (len(l2) - len(l2.lstrip())) == 0 or s2.startswith("- ") \
+                            or ":" not in s2:
+                        break
+                    k2, _, v2 = s2.partition(":")
+                    d[k2.strip()] = _unquote(v2)
+                    i += 1
+                data[key] = d
+                continue
         items = []
         while i < n:
             l2 = _strip_comment(lines[i])
@@ -352,6 +385,14 @@ class Linter:
         if not nodes:
             self.add(ERROR, "§3.1", self.root, "no AGENTS.md found under root", "L1")
             return self.findings
+        # §3.1/§6.2: the root of the linted tree must be a node itself. Without
+        # this, the walk adopts whatever conformant subtree it finds and reports
+        # it as the whole project, so a non-conformant root passes silently.
+        if not os.path.exists(os.path.join(self.root, "AGENTS.md")):
+            self.add(ERROR, "§3.1", self.root,
+                     "--root is not a node: no AGENTS.md here. Point --root at the "
+                     "project index, or add one.", "L1")
+            return self.findings
         self.check_nodes(nodes)
         self.check_graph(nodes)
         index = next((n for n in nodes.values()
@@ -382,6 +423,7 @@ class Linter:
                 if "up" in n.fm:
                     self.add(ERROR, "§4.2", n.path,
                              "project-index must not declare up", "L1")
+                self._check_tracker(n)
                 topo = n.fm.get("topology")
                 if topo not in ("monorepo", "polyrepo"):
                     self.add(ERROR, "§6.3.1", n.path,
@@ -393,19 +435,50 @@ class Linter:
                 if "topology" in n.fm:
                     self.add(WARN, "§4.2", n.path,
                              "topology belongs on project-index, not module")
+                if "tracker" in n.fm:
+                    self.add(WARN, "§7.3.5.1", n.path,
+                             "tracker must not appear on a module; it is a property of "
+                             "the project and belongs on the project-index")
             # size budget: a ceiling (§3.4) and a floor (§3.4.1)
             if n.line_count > self.args.max_lines:
                 self.add(WARN, "§3.4", n.path,
                          f"context file is {n.line_count} lines "
                          f"(> {self.args.max_lines} budget); move detail into docs/",
                          gate="L3")
-            elif n.line_count < self.args.min_lines:
+            elif self._body_lines(n.path) < self.args.min_lines:
                 self.add(INFO, "§3.4.1", n.path,
-                         f"context file is {n.line_count} lines "
+                         f"context file body is {self._body_lines(n.path)} lines "
                          f"(< {self.args.min_lines}); absence of content is not "
                          f"conformance - check what §4.6 admits here")
             self._check_time_neutral(n.path, "§4.7.1")
             self.check_alias(n)
+
+    def _body_lines(self, path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return body_line_count(fh.read())
+        except OSError:
+            return 0
+
+    def _check_tracker(self, n):
+        """§7.3.5. The second substrate needs an address, or §8.3 sends an agent
+        somewhere it cannot name. Ungated: §9 keeps §7.3 out of the levels."""
+        t = n.fm.get("tracker")
+        if t is None:
+            self.add(WARN, "§7.3.5", n.path,
+                     "no tracker declared; §7.3 makes the tracker the second substrate, "
+                     "so §4.2 asks the project index to say where it is")
+            return
+        if not isinstance(t, dict):
+            self.add(WARN, "§7.3.5", n.path,
+                     f"tracker must be a mapping with an 'at' key, got {t!r}")
+            return
+        at = t.get("at")
+        if not at or not isinstance(at, str):
+            self.add(WARN, "§7.3.5", n.path, "tracker missing at: (URL or org/repo)")
+        elif not (REMOTE_RE.match(at) or re.match(r"^[\w.-]+/[\w.-]+$", at)):
+            self.add(WARN, "§7.3.5", n.path,
+                     f"tracker at: {at!r} is neither a URL nor org/repo")
 
     def check_alias(self, n):
         claude = os.path.join(n.directory, "CLAUDE.md")
@@ -418,6 +491,10 @@ class Linter:
             if os.path.basename(tgt) != "AGENTS.md":
                 self.add(WARN, "§3.2", claude,
                          f"CLAUDE.md symlink points to {tgt!r}, not AGENTS.md")
+            elif os.path.realpath(claude) != os.path.realpath(n.path):
+                self.add(WARN, "§3.2", claude,
+                         f"CLAUDE.md symlink target {tgt!r} does not resolve to this "
+                         "node's AGENTS.md (§3.2 requires identical content)")
         else:
             try:
                 with open(claude, encoding="utf-8") as f:
@@ -559,18 +636,17 @@ class Linter:
                 if not f.endswith(".md"):
                     continue
                 full = os.path.join(dirpath, f)
-                if in_docs and is_scaffolding(f):
+                if not in_docs:
+                    continue          # §7.1 governs docs/ only
+                if is_scaffolding(f):
                     continue          # §7.1.4: class rules bind records only
                 if parent == "adr":
                     saw_adr = True
                     self._check_adr(full, f)
-                    continue
+                    continue          # §7.3.2: an ADR's status is exempt
                 if parent == "records":
                     self._check_record(full, f)
-                    continue
-                if not in_docs:
-                    continue
-                if f == "glossary.md":
+                if f.lower() == "glossary.md":
                     self._check_glossary_placement(full, dirpath, index_docs)
                 self._check_status_frontmatter(full)
                 if parent not in IMMUTABLE_CLASSES:
@@ -608,6 +684,13 @@ class Linter:
         if not RECORD_FILE_RE.match(name):
             self.add(WARN, "§7.2.3", full,
                      "record filename must be YYYY-MM-DD-slug.md", gate="L3")
+            return
+        try:
+            date.fromisoformat(name[:10])
+        except ValueError:
+            self.add(WARN, "§7.2.3", full,
+                     f"record filename carries {name[:10]!r}, which is not a real "
+                     "calendar date", gate="L3")
 
     @staticmethod
     def _docs_dir(node):
@@ -624,13 +707,21 @@ class Linter:
 
     def _check_status_frontmatter(self, full):
         """§7.3.2. A durable document that states its own status is an issue
-        wearing a document's clothes. `adr/` is exempt: its status is the
-        decision's own lifecycle, not a report on work in flight."""
+        wearing a document's clothes. `adr/` is exempt (§7.3.2's own carve-out):
+        its status is the decision's own lifecycle, not a report on work in
+        flight. Ungated: §9 places the substrate rule outside the conformance
+        levels, so this reports without certifying."""
         fm, _ = self._read_fm(full)
-        if fm.get("status") is not None:
+        status = fm.get("status")
+        # `~`, `null` and an empty value are YAML nulls. PyYAML resolves them to
+        # None and the built-in parser to a string, so normalise or the reported
+        # findings would depend on which parser happened to be installed.
+        if isinstance(status, str) and status.strip().lower() in ("", "~", "null"):
+            status = None
+        if status is not None:
             self.add(WARN, "§7.3.2", full,
-                     f"durable doc declares status: {fm['status']!r}; status "
-                     "belongs to the tracker, not the repository", gate="L3")
+                     f"durable doc declares status: {status!r}; status "
+                     "belongs to the tracker, not the repository")
 
     def _check_time_neutral(self, full, rule):
         """§4.7.1. Narration of a change, in a document nobody can date."""
@@ -641,17 +732,25 @@ class Linter:
             return
         fm_text, _ = split_frontmatter(text)
         body = text[text.index(fm_text) + len(fm_text):] if fm_text else text
-        hits = []
+        hits, fenced = [], False
         for line in body.splitlines():
-            if line.lstrip().startswith(">"):
+            stripped = line.lstrip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                fenced = not fenced
+                continue
+            if fenced:
+                continue          # a code sample is not prose
+            if stripped.startswith(">"):
                 continue          # a quoted rule may name the terms it forbids
-            m = TIME_RE.search(line)
-            if m and m.group(0).lower() not in hits:
-                hits.append(m.group(0).lower())
+            for m in TIME_RE.finditer(line):
+                if m.group(0).lower() not in hits:
+                    hits.append(m.group(0).lower())
         if hits:
+            shown = ", ".join(f"{h!r}" for h in hits[:5])
+            more = f" (+{len(hits) - 5} more)" if len(hits) > 5 else ""
             self.add(WARN, rule, full,
                      "time-connotated prose in a document its reader cannot date: "
-                     + ", ".join(f"{h!r}" for h in hits[:5]))
+                     + shown + more)
 
 
 def _http_ok(url):
@@ -721,7 +820,16 @@ def main(argv=None):
     ap.add_argument("--min-lines", type=int, default=20,
                     help="context-file size floor (default: 20; §3.4.1)")
     ap.add_argument("--no-color", action="store_true")
+    ap.add_argument("--stale-days", type=int, default=None,
+                    help=argparse.SUPPRESS)   # removed in 2.0; accepted, ignored
     args = ap.parse_args(argv)
+
+    if args.stale_days is not None:
+        print("note: --stale-days was removed in ADS 2.0 along with the ephemeral "
+              "classes it served; ignoring it.", file=sys.stderr)
+    if not os.path.isdir(args.root):
+        print(f"error: --root {args.root!r} is not a directory", file=sys.stderr)
+        return 2
 
     findings = Linter(args.root, args).run()
     level, note = conformance(findings)

@@ -6,7 +6,6 @@ status: proposed            # proposed | accepted | superseded | deprecated
 date: <YYYY-MM-DD>
 supersedes: <ADR-NNNN or ->   # optional
 superseded-by: <ADR-NNNN or ->  # set when this ADR is later reversed
-decides: <tracker ref, e.g. acme/platform#412>   # the issue this closes (§7.3.5)
 normative-in: <path to the doc that states this as current fact>
 revisit-when: <a condition a reader can check>   # omitting this asserts permanence
 ---

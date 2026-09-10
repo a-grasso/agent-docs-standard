@@ -3,7 +3,6 @@ id: ADR-0001
 title: Rules are pure functions over a windowed reading stream
 status: accepted
 date: 2026-06-25
-decides: centersight/platform#147
 normative-in: ../../AGENTS.md
 supersedes: -
 superseded-by: -

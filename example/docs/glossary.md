@@ -26,6 +26,11 @@ by `functions`.
 _Avoid_: "alarm" (industry term for the plant's own local annunciation, which CenterSight does
 not own), "notification" (names the delivery, which is "dispatch").
 
+**Event**:
+A message on the bus, published by one module and consumed by others; the only sanctioned
+channel between modules. Named `<domain>.<past-tense-verb>`, e.g. `telemetry.ingested`.
+_Avoid_: "message" (names the transport), "signal" (names a reading-derived quantity).
+
 **Dispatch**:
 Delivery of an alert to a channel. A single alert may be dispatched several times.
 _Avoid_: "send", "notify" (both hide that delivery is retried and separately observable).

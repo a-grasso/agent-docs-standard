@@ -73,9 +73,9 @@ name the file to read in that repo.
 Every class in `docs/` is durable. Immutable-and-dated, or mutable-and-time-neutral (§7.1.3):
 
 - `adr/` - `NNNN-slug.md`, frontmatter `status: proposed|accepted|superseded|deprecated`.
-  Immutable once accepted; reverse via a new ADR. Also carries `decides:` (the issue it
-  closes), `normative-in:` (the doc allowed to state it as current fact), and `revisit-when:`
-  (a *checkable* reopening condition; omitting it asserts permanence).
+  Immutable once accepted; reverse via a new ADR. Also carries `normative-in:` (the doc
+  allowed to state it as current fact) and `revisit-when:` (a *checkable* reopening
+  condition; omitting it asserts permanence). It does **not** name an issue (§7.3.5.2).
 - `decisions/` - lightweight, dated, append-only, never edited.
 - `records/` - `YYYY-MM-DD-slug.md`. Dated, immutable records of *events*: upgrades,
   incidents, migrations, benchmark runs. An event has no alternatives; a decision does.
@@ -96,6 +96,28 @@ belong to the issue tracker**, never to `docs/` or a context file (§7.3). A doc
 states status has no invalidation event its reader can see, so it rots silently. What still
 has to happen when work lands is **distillation**: the constraint learned, the interface
 fixed, the decision taken get written into the right class. The work's *state* stays put.
+
+An ADR's own `status:` is the one exemption (§7.3.2): it reports whether the project is bound
+by a decision, and a superseding ADR invalidates it visibly.
+
+The tracker is addressed **once**, by the `tracker` key on the project index (§7.3.5). No
+individual document links a tracker item (§7.3.5.2): a durable doc outlives the work that made
+it, so *"which issue closed this?"* is deliberately not answerable from the repository.
+
+## Routing: where a given piece of knowledge goes (§7.4)
+Applied when content is written; first match wins.
+
+| # | If the content is | It belongs in |
+|---|---|---|
+| R1 | status, sequencing, ownership, or what is next | the tracker |
+| R2 | an invariant, command, trap or boundary needed on most tasks in a node | that node's `AGENTS.md` |
+| R3 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` |
+| R4 | a decision that is thin, cheaply reversible, or closed without commitment | `docs/decisions/` |
+| R5 | a completed event whose detail is worth keeping | `docs/records/` |
+| R6 | explanatory or reference detail needed for a recognisable minority of tasks | the right durable class, reached by pointer |
+
+Content **MUST NOT** be written twice; the second destination links instead (§7.4.2). Routing
+itself is not mechanically checkable (§7.4.4) - tooling checks the taxonomy, not the routing.
 
 ## Conformance
 - **L1** minimal: valid `AGENTS.md` per node; single reachable `project-index`; modules have valid

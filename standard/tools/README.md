@@ -21,6 +21,7 @@ python3 standard/tools/ads-lint.py --root <project> --json | jq   # machine-read
 | `--check-remote` | Actually reach out to verify `dep:` git/https targets (needs network; off by default so the linter stays offline and fast). |
 | `--max-lines N` | Context-file size budget (default 200; §3.4). |
 | `--min-lines N` | Context-file size floor (default 20; §3.4.1). Set `0` to disable. |
+| `--stale-days N` | Removed in 2.0. Accepted and ignored, so a 1.0 CI job does not break. |
 | `--no-color` | Disable ANSI colour. |
 
 **Exit code:** `1` if any **error** (or any **warn** under `--strict`), else `0`.
@@ -33,12 +34,15 @@ python3 standard/tools/ads-lint.py --root <project> --json | jq   # machine-read
 | Pointer graph | `up`/`ref`/local-`dep` targets resolve **case-sensitively**, on every host filesystem; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). |
 | Aliases | a `CLAUDE.md` symlink to `AGENTS.md` exists beside each node (§3.2). |
 | Docs taxonomy | ADR filenames `NNNN-slug.md` with a valid `status`; record filenames `YYYY-MM-DD-slug.md`; one glossary, at the index; `README.md` and `_`-prefixed files exempt everywhere in `docs/` (§7.1.4). |
-| Substrates | a durable doc that declares `status:` is stating work state, which belongs to the tracker (§7.3.2). `adr/` is exempt: its status is the decision's own lifecycle. |
+| Substrates | a durable doc that declares `status:` is stating work state, which belongs to the tracker (§7.3.2). `adr/` is exempt: its status is the decision's own lifecycle. Reported **ungated**: §9 places the substrate rule outside the conformance levels, so this finding never changes the reported level. Use `--strict` to gate CI on it. |
 | Time neutrality | context-file bodies (§4.7.1) and mutable `docs/` classes (§7.1.3) are checked for narration of change. The term list deliberately excludes `now`/`since`/`still`/`new`/`old`: a check that fires on those trains its readers to ignore it. |
 | Size budget | context files within `--max-lines` (§3.4), and not under `--min-lines` (§3.4.1). |
 
 Findings carry a **severity** (`error`/`warn`/`info`), the **spec section**, the **path**, and
-(where relevant) the **conformance level they gate** (`[L1]`/`[L2]`/`[L3]`).
+(where relevant) the **conformance level they gate** (`[L1]`/`[L2]`/`[L3]`). Findings for the
+clauses §9 leaves uncertified (§4.7 time neutrality, §7.3.2 substrates, §3.4.1's floor) carry
+**no gate** by design: they are reported, and they fail `--strict`, but they never move the
+level. A level certifies structure, never prose.
 
 ### CI
 

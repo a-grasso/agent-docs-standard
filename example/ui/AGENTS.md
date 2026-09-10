@@ -7,7 +7,7 @@ dep:
   - { id: ng-env,         at: git@github.com:centersight/ng-env.git#AGENTS.md, kind: repo,         hint: environment/config injection - read config via ng-env, never process.env }
   - { id: centersight-api, at: https://centersight-api-doc.com,                kind: external-doc, hint: REST API the dashboard reads telemetry & alerts from }
 docs: ./docs
-updated: 2026-07-10
+updated: 2026-09-10
 ---
 
 # ui

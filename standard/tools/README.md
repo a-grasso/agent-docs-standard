@@ -31,7 +31,7 @@ python3 standard/tools/ads-lint.py --root <project> --json | jq   # machine-read
 | Area | Rules |
 |------|-------|
 | Frontmatter | valid YAML block; `kind ∈ {project-index, module}`; exactly one reachable `project-index`; `project-index` has `topology` and no `up`; `module` has `up` (§3, §4, §6.3). |
-| Pointer graph | `up`/`ref`/local-`dep` targets resolve **case-sensitively**, on every host filesystem; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). |
+| Pointer graph | `up`/`ref`/local-`dep` targets resolve **case-sensitively**, on every host filesystem; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). Only *declared* `dep`s: nothing here reads source, so an undeclared dependency is invisible (§5.3.5). |
 | Aliases | a `CLAUDE.md` symlink to `AGENTS.md` exists beside each node (§3.2). |
 | Docs taxonomy | ADR filenames `NNNN-slug.md` with a valid `status`; record filenames `YYYY-MM-DD-slug.md`; one glossary, at the index; `README.md` and `_`-prefixed files exempt everywhere in `docs/` (§7.1.4). |
 | Substrates | a durable doc that declares `status:` is stating work state, which belongs to the tracker (§7.3.2). `adr/` is exempt: its status is the decision's own lifecycle. Reported **ungated**: §9 places the substrate rule outside the conformance levels, so this finding never changes the reported level. Use `--strict` to gate CI on it. |

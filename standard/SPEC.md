@@ -293,6 +293,15 @@ URL to external documentation.
 5.3.4. Semantics: **"go upstream."** `dep` targets are **read-only** from this project's
 perspective. An agent follows `dep` to understand an interface or contract it consumes.
 
+5.3.5. **Completeness.** Every dependency a node consumes across an ownership boundary
+**SHOULD** be declared as a `dep`. This clause is **normative but not certified** (§9):
+establishing that a declaration is *complete* means finding what a node consumes and does not
+declare, which means reading source in every language the project builds with. That is a
+language-aware job, and the ecosystem the project already uses does it better than a Markdown
+linter can. A project that wants the completeness half enforced states it as a constraint and
+names the enforcer that does it (§4.5.2) - an import-boundary lint rule, an architecture
+test - exactly as it would for any other invariant tooling here cannot see.
+
 ### 5.4 Direction and reciprocity
 
 5.4.1. `up` and `ref` **SHOULD** be reciprocal where they describe the same parent/child
@@ -651,8 +660,8 @@ A project **MAY** claim one of three cumulative levels.
 - The project index is reachable from every node via `up` (§6.2).
 
 **Level 2 - Navigable graph.**
-- All of L1, plus: the index's `ref` enumerates every module (§5.2.2), and every cross-boundary
-  dependency is declared as a `dep` (§5.3).
+- All of L1, plus: the index's `ref` enumerates every module (§5.2.2).
+- Every declared `dep` is well-formed and its target resolves (§5.3.2, §5.3.3).
 - `up`/`ref` reciprocity holds (§5.4.1).
 
 **Level 3 - Documented & maintained.**
@@ -667,6 +676,12 @@ A project **MAY** claim one of three cumulative levels.
 > tooling can establish (§7.4.4).
 > A project **MAY** report them as separately reviewed; it **MUST NOT** present a conformance
 > level as evidence of them.
+
+L2 certifies that the graph a project **declares** is navigable and resolves. It does not
+certify that the declaration is complete: §5.3.5 gives the reason, and it is a different one
+from the clauses above - not that the property is prose, but that establishing it means
+reading source in languages this standard knows nothing about. A level that claimed it would
+be claiming the work of a tool that is not here.
 
 ---
 

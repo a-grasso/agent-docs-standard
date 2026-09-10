@@ -16,7 +16,6 @@ tracker:
   kind: github
   hint: work state - status, sequencing and what is next; none of it is in this repo
 docs: ./docs
-updated: 2026-09-10
 ---
 
 # CenterSight
@@ -38,13 +37,15 @@ dashboards and alerts to operators.
   communication goes through published contracts (events or the API). ADR-0002; enforced by
   the ESLint `no-restricted-imports` rule.
 - **Telemetry is append-only:** ingestion MUST NOT mutate historical readings. ADR-0003;
-  enforced by the store's write-once grant (`infra/main.tf`) and `functions` contract tests.
-- **One vocabulary:** name domain concepts as `docs/glossary.md` names them, in identifiers,
-  tests and commit messages alike. `(unenforced)` - the avoid-list is a search pattern, so this
-  is mechanisable, but nothing greps it yet.
+  enforced by the store's write-once grant ([`infra/main.tf`](infra/main.tf)) and the
+  `functions` contract tests.
+- **One vocabulary:** name domain concepts as [`docs/glossary.md`](docs/glossary.md) names
+  them, in identifiers, test names and commits alike. Enforced by `ads-lint`'s §7.2.4
+  avoid-list check, which greps every context file and mutable document for a rejected
+  synonym.
 - **Work state is not in this repository:** status, sequencing and what is next live in the
   issue tracker, never in `docs/` or a context file. ADR-0004; enforced by `ads-lint`'s §7.3.2
-  check. Completed events are written up in `docs/records/`.
+  check. Completed events are written up in [`docs/records/`](docs/records/).
 
 ## Principles
 - **Evidence over convenience.** Where a design choice trades away the ability to reconstruct

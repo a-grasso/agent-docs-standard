@@ -438,10 +438,6 @@ class SizeFloor(DocsCase):
         self.assertEqual([f for f in self.lint_with(0) if f.rule == "§3.4.1"], [])
 
 
-if __name__ == "__main__":
-    unittest.main()
-
-
 class RootMustBeANode(unittest.TestCase):
     """§3.1/§6.2: --root is the project index, not "wherever a node turns up".
 
@@ -596,3 +592,170 @@ class FallbackParserHandlesNestedMaps(unittest.TestCase):
     def test_block_sequence_still_works(self):
         d = ads_lint._minimal_parse("ref:\n  - { at: a/AGENTS.md }\n  - b/AGENTS.md\n")
         self.assertEqual(d["ref"], [{"at": "a/AGENTS.md"}, "b/AGENTS.md"])
+
+
+class EnforcerCase(unittest.TestCase):
+    """§4.5.2.1. A file-shaped enforcer named under `## Constraints` has to be
+    a file that is there."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+
+    def index(self, constraints, working="- **Build:** `make`\n"):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               "---\nkind: project-index\ntopology: monorepo\n---\n\n"
+               "# Fixture\n\n## Purpose\nA fixture.\n\n"
+               f"## Working here\n{working}\n## Constraints\n{constraints}")
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
+        return [f for f in ads_lint.Linter(self.root, args).run()
+                if f.rule == "§4.5.2.1"]
+
+    def test_resolving_enforcer_is_clean(self):
+        _write(os.path.join(self.root, "test", "purity.test.ts"), "// enforcer\n")
+        self.index("- **Pure:** no I/O. Enforced by `test/purity.test.ts`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_missing_enforcer_warns_ungated(self):
+        self.index("- **Pure:** no I/O. Enforced by `test/purity.test.ts`.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.WARN)
+        self.assertEqual(found[0].gate, "", "§9 keeps §4.5 out of the levels")
+        self.assertIn("test/purity.test.ts", found[0].msg)
+
+    def test_link_form_is_checked_once(self):
+        self.index("- **Pure:** enforced by "
+                   "[`test/purity.test.ts`](test/purity.test.ts).\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+
+    def test_rule_and_command_names_are_not_paths(self):
+        self.index("- **Contracts only:** enforced by the ESLint "
+                   "`no-restricted-imports` rule, the nightly `terraform plan` "
+                   "job and a `process.env` ban.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_directory_enforcer_resolves(self):
+        _write(os.path.join(self.root, "policy", "iam.rego"), "package p\n")
+        self.index("- **Write-once:** see `policy/`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_paths_outside_constraints_are_not_checked(self):
+        self.index("- **Pure:** no I/O. (unenforced)\n",
+                   working="- **Entry points:** `src/engine.ts`, `src/rules/`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_fenced_sample_is_not_a_constraint(self):
+        self.index("- **Pure:** no I/O. (unenforced)\n\n"
+                   "```markdown\n- Enforced by `test/nowhere.test.ts`.\n```\n")
+        self.assertEqual(self.lint(), [])
+
+
+GLOSSARY = """# Glossary
+
+**Reading**:
+One sensor sample.
+_Avoid_: "measurement" (customers use it for a derived aggregate), "datapoint" (names
+the chart pixel), "event" (reserved for bus messages).
+
+**Event**:
+A message on the bus.
+_Avoid_: "signal" (names a reading-derived quantity).
+"""
+
+
+class VocabularyCase(unittest.TestCase):
+    """§7.2.4. The avoid-list is the checkable half of a glossary."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+        _write(os.path.join(self.root, "AGENTS.md"), INDEX_AGENTS)
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+        self.glossary(GLOSSARY)
+
+    def glossary(self, text):
+        _write(os.path.join(self.root, "docs", "glossary.md"), text)
+
+    def doc(self, relpath, text):
+        _write(os.path.join(self.root, "docs", relpath), text)
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
+        return [f for f in ads_lint.Linter(self.root, args).run()
+                if f.rule == "§7.2.4"]
+
+    def test_avoided_synonym_is_reported_with_its_canonical_term(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nEach measurement is stored.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.WARN)
+        self.assertEqual(found[0].gate, "", "naming drift is prose, not structure")
+        self.assertIn("'measurement'", found[0].msg)
+        self.assertIn("'Reading'", found[0].msg)
+
+    def test_plural_is_reported(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nWe keep raw datapoints.\n")
+        self.assertEqual(len(self.lint()), 1)
+
+    def test_synonym_that_is_another_entrys_canonical_term_is_not_reported(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nAn event is published.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_term_quoted_inside_a_rejection_reason_is_not_an_avoid_term(self):
+        # "bus messages" sits inside the parenthesised reason for rejecting
+        # "event"; reading it as a rejection would ban the word that explains
+        # the rejection.
+        self.glossary(GLOSSARY.replace("bus messages", '"bus messages"'))
+        self.doc("concept/01-drivers.md", "# Drivers\n\nBus messages carry events.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_code_spans_and_fences_are_not_prose(self):
+        self.doc("concept/01-drivers.md",
+                 "# Drivers\n\nThe field is `measurement_id`.\n\n"
+                 "```python\nmeasurement = 1\n```\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_glossary_itself_is_exempt(self):
+        self.assertEqual(self.lint(), [])
+
+    def test_immutable_classes_are_exempt(self):
+        self.doc("records/2026-08-14-outage.md",
+                 "# Outage\n\nThe customer called it a measurement.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_context_files_are_scanned(self):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               INDEX_AGENTS + "\n## Purpose\nWe store every measurement.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(os.path.basename(found[0].path), "AGENTS.md")
+
+    def test_no_glossary_means_no_findings(self):
+        os.remove(os.path.join(self.root, "docs", "glossary.md"))
+        self.doc("concept/01-drivers.md", "# Drivers\n\nEach measurement is stored.\n")
+        self.assertEqual(self.lint(), [])
+
+
+class TestsRunDirectlyAndUnderDiscovery(unittest.TestCase):
+    """`unittest.main()` belongs at the end of the file: run in the middle, it
+    executes before the classes below it are defined, so running the file
+    directly silently exercises fewer tests than discovery does."""
+
+    def test_main_guard_is_last(self):
+        with open(os.path.join(_HERE, "test_ads_lint.py"), encoding="utf-8") as fh:
+            body = fh.read()
+        guards = [i for i, line in enumerate(body.splitlines())
+                  if line.startswith("if __name__")]
+        self.assertEqual(len(guards), 1, "exactly one top-level main guard")
+        self.assertTrue(body.rstrip().endswith("unittest.main()"))
+
+
+if __name__ == "__main__":
+    unittest.main()

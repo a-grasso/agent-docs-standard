@@ -174,7 +174,9 @@ say under, and delete the guidance comment at the top once the file is real.
    manifests, `Makefile`/`Justfile`, or CI config.
    Keep `## Constraints` minimal: capture only invariants the user states or that are obvious
    from config, and **name the enforcer** for each (the test, lint rule or CI job), or mark it
-   `(unenforced)` (§4.5.2). Don't invent rules.
+   `(unenforced)` (§4.5.2). Don't invent rules. Where the enforcer is a file in the repo,
+   write it as a relative Markdown link and check that it resolves - `ads-lint` reports one
+   that does not (§4.5.2.1). Naming a test that is not there is worse than `(unenforced)`.
    `## Traps` and `## Decisions in force` are worth asking about but never worth inventing;
    `## Principles` goes on the index only (§4.5.5). Expect different nodes to end up with
    different section sets - if they all match, they were filled rather than described.

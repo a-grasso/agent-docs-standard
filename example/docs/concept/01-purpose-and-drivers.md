@@ -36,5 +36,5 @@ The design is met when:
 - no reading in the store has ever been mutated after write;
 - any one module can be replaced without touching another module's source.
 
-How far each criterion is met is a measurement, not a document: it is asserted by tests and
-by the SLO dashboards, or written once as a dated assessment in `records/`.
+How far each criterion is met is measured, not documented: it is asserted by tests and by
+the SLO dashboards, or written once as a dated assessment in `records/`.

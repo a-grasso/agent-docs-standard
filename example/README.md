@@ -33,6 +33,13 @@ and `ui` carry `## Traps`, `requira` carries `## Decisions in force`, `infra` ca
 and `## Principles` appears only on the index, where §4.5.5 confines it. A node writes the
 sections it has something to say in.
 
+Every file-shaped enforcer named under `## Constraints` is a relative link to a file that is
+really there (§4.5.2.1): `requira/test/purity.test.ts`, `infra/test/policy.tftest.hcl`, and
+two under `functions/test/`. They are stubs like the rest of the code here, which is the
+point - `ads-lint` checks that the path resolves, not that the test is any good, and a
+constraint that names a test which is not there is worse than one marked `(unenforced)`.
+`functions/AGENTS.md` carries the one constraint with no mechanism behind it, marked as such.
+
 There is no `plans/` or `reviews/` here. Work in flight lives in the issue tracker, which is
 the other substrate (§7.3) and is addressed once, by the `tracker` key on the project index
 (§7.3.5). No document here links an issue.
@@ -43,8 +50,8 @@ linter over it: `python3 .ads/ads-lint.py --root . --strict` reports zero findin
 to copy into a real adoption. It does not run here: GitHub only reads workflows from
 `.github/workflows/` at a repository root, and this example is a subdirectory.
 
-> **On dates in this example.** CenterSight is fiction, authored as a single set. Its ADR dates
-> and `updated:` fields position the documents relative to each other; they are not a record of
-> when anything was really accepted. §7.2.1's rule that an accepted ADR must not be edited binds
+> **On dates in this example.** CenterSight is fiction, authored as a single set. Its ADR and
+> record dates position the documents relative to each other; they are not a record of when
+> anything was really accepted. §7.2.1's rule that an accepted ADR must not be edited binds
 > real projects, where acceptance is an event with witnesses. Do not read edits to this
 > example's ADRs as a demonstration that editing accepted ADRs is allowed.

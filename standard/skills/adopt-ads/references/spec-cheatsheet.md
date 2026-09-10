@@ -15,7 +15,7 @@ repo. This cheatsheet is enough to scaffold correctly; consult the full `SPEC.md
   |---|---|---|
   | `## Purpose` | REQUIRED | what this node is, and where its boundary runs |
   | `## Working here` | REQUIRED | build, test, lint, run; entry points |
-  | `## Constraints` | RECOMMENDED | each names its enforcer, or is marked `(unenforced)` |
+  | `## Constraints` | RECOMMENDED | each names its enforcer, or is marked `(unenforced)`; a file-shaped enforcer is a resolvable relative link, unpinned (§4.5.2.1) |
   | `## Traps` | OPTIONAL | what looks correct and is not |
   | `## Decisions in force` | OPTIONAL | one line + ADR link, never the rationale |
   | `## Principles` | OPTIONAL | **index only**; one line each, rationale in `concept/` |
@@ -41,7 +41,7 @@ ref:                         # module map: list every module
 dep:                         # upstream you consume but don't own
   - { id: <id>, at: <path|git URL#file|https URL>, kind: repo|package|external-doc, hint: <what and why> }
 docs: ./docs                 # OPTIONAL (default ./docs)
-updated: YYYY-MM-DD          # OPTIONAL
+# no `updated:` key: git already dates the file (SPEC 4.2.1)
 
 # module
 kind: module                 # REQUIRED
@@ -83,7 +83,9 @@ Every class in `docs/` is durable. Immutable-and-dated, or mutable-and-time-neut
   Time-connotated prose is fine here, because the document is dated.
 - `glossary.md` - one per project, in the **index's** `docs/`, found by convention not by
   pointer. Each entry: canonical term, definition, and the synonyms to avoid *with reasons*.
-  The avoid-list is the load-bearing half; it is a grep pattern.
+  The avoid-list is the load-bearing half; it is a grep pattern, and `ads-lint` runs it.
+  Do not reject a word ordinary technical English needs elsewhere ("message" in *commit
+  message*) unless the project is willing to stop writing it.
 - `concept/` - durable design intent: purpose and drivers, principles' rationale, criteria.
   No planning state, no fulfilment prose.
 - also: `guides/`, `runbooks/`, `references/`, `domain/`.

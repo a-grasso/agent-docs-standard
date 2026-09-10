@@ -99,7 +99,15 @@ the file.
 | `topology` | enum | **REQUIRED** on `project-index`; **MUST NOT** appear on `module` | `monorepo` or `polyrepo` (§6.3). |
 | `docs` | path | OPTIONAL | Location of this node's docs folder; defaults to `./docs`. |
 | `tracker` | tracker | **RECOMMENDED** on `project-index`; **MUST NOT** appear on `module` | Where work state lives (§7.3.5). |
-| `updated` | date | OPTIONAL | ISO-8601 date the file was last meaningfully changed. |
+
+4.2.1. There is deliberately **no** key for the date a context file was last changed. Version
+control already holds that answer exactly (`git log -1 --format=%cs <file>`), which makes a
+hand-maintained copy derivable content (§4.6.3, A1) and a self-report nothing can check. It
+is also precisely the undatable claim §4.7.2 rejects, wearing a frontmatter key: a reader
+cannot tell "updated on that date and still true" from "updated on that date and abandoned
+the same day". Freshness is a property of the tree, not a declaration a file makes about
+itself. A key left over from an earlier version is tolerated as an unknown key (§4.4) rather
+than reported, but nothing in this standard asks for it.
 
 4.3. **Exactly one** node in a reachable graph **MUST** have `kind: project-index`. It is the
 **root** and **MUST NOT** declare `up`.
@@ -126,6 +134,19 @@ omitting any that do not apply:
 CI job that enforces it. A constraint with no such mechanism **SHOULD** be marked
 `(unenforced)`, so that the difference between an invariant and an aspiration stays visible to
 the reader. Naming the enforcer also makes the constraint checkable: an agent can run it.
+
+4.5.2.1. **File-shaped enforcers.** Where the enforcer is a file in this repository - a test,
+a fixture, a policy - it **SHOULD** be written as a relative Markdown link to that file,
+resolved from the declaring file's directory like any other pointer (§5). A named file that is
+not there is worse than `(unenforced)`: it reads as an invariant, sends an agent looking, and
+the absence is discoverable only by trying. The link form also makes the claim mechanically
+checkable, and conformance tooling **SHOULD** report a path in a `## Constraints` entry that
+does not resolve.
+
+The link **SHOULD NOT** be pinned to the enforcer's content. The constraint claims that a
+mechanism exists, not that the mechanism still reads the way it read when the constraint was
+written; a pin would fire on every edit to the test and teach its reader to re-bless it
+unexamined. A lint rule or CI job named in prose is not file-shaped and needs no link.
 
 4.5.3. A node's section set is determined by what that node has to say. A template **MAY** be
 used as an authoring prompt; every heading it offers for which the node has no admissible
@@ -416,6 +437,18 @@ someone needed to edit was a choice that deserved an ADR (§7.4.4).
 - The rejected-synonym list is the load-bearing half of an entry. A glossary that only defines
   terms *records* vocabulary; one that names the terms to avoid *prevents drift*, and unlike a
   definition it is mechanically checkable, because an avoid-list is a search pattern.
+  Conformance tooling **SHOULD** run that pattern over the project's context files and mutable
+  documents, and report each hit.
+- A synonym that one entry rejects and another entry makes canonical is the one case the
+  pattern cannot decide: a grep does not know which entry a sentence is about, and the term is
+  correct wherever the other entry applies. Such a synonym is still worth listing for a human
+  reader, and tooling **SHOULD** exclude it rather than report it.
+- Choose rejected synonyms knowing they will be run as a pattern. A word that ordinary
+  technical English needs elsewhere - "message" in *commit message*, "measurement" in *the
+  criterion is a measurement* - will fire on uses that have nothing to do with the domain, and
+  a check that fires on innocent uses is dismissed rather than obeyed (§4.7.1 makes the same
+  trade for the same reason). Either reject the specific phrase rather than the bare word, or
+  accept the consequence and write the innocent sentence some other way.
 - A glossary **MUST NOT** carry implementation detail or decisions. Its scope is naming:
   detail belongs to `AGENTS.md` (§4.5) or a durable class (§7.2.6), decisions to `adr/`
   (§7.2.1). A glossary **SHOULD** state this boundary in its own opening lines.
@@ -663,7 +696,6 @@ tracker:
   kind: github
   hint: work state; nothing here states status
 docs: ./docs
-updated: 2026-07-10
 ---
 
 # module
@@ -676,7 +708,6 @@ ref:
 dep:
   - { id: payments-api, at: https://docs.payments.example/api, kind: external-doc }
 docs: ./docs
-updated: 2026-07-10
 ---
 ```
 
@@ -698,38 +729,48 @@ See [`templates/`](./templates/) for full, copy-ready files.
 2.0 adds the content half of the standard: 1.0 governed where context files live and how they
 link, and said almost nothing about what they contain.
 
-The major version is deliberate. Two document classes are removed, a documented
-linter flag is gone, and a 1.0 project that used the ephemeral classes loses a
-conformance level under 2.0 tooling. That is a breaking change and is versioned as one.
+The major version is deliberate. Two document classes are removed, along with a documented
+linter flag, an L3 clause and a frontmatter key. A 1.0 tree that used the ephemeral classes
+is no longer conformant, and a job pinned to `--strict` starts failing on it. That is a
+breaking change and is versioned as one.
 
-**New.** Body sections with per-section requirement levels and named enforcers (§4.5); the
-A1-A4 admissibility test (§4.6); time neutrality (§4.7); `records/`, a dated immutable class
-for events (§7.2.3); `glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3);
-routing rules R1-R6 (§7.4); the ADR field `revisit-when` (§7.2.1); the
-`tracker` key, which gives the second substrate an address (§4.2, §7.3.5); a tree-wide
-scaffolding exemption (§7.1.4), generalised from the `adr/`-only carve-out of 1.0.
+**New.** Body sections with per-section requirement levels and named enforcers (§4.5), a
+file-shaped one written as a resolvable link (§4.5.2.1); the A1-A4 admissibility test (§4.6);
+time neutrality (§4.7); `records/`, a dated immutable class for events (§7.2.3);
+`glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3); routing rules R1-R6
+(§7.4); the ADR field `revisit-when` (§7.2.1); the `tracker` key, which gives the second
+substrate an address (§4.2, §7.3.5); a tree-wide scaffolding exemption (§7.1.4), generalised
+from the `adr/`-only carve-out of 1.0.
 
 **Removed.** Per-document issue links: no document names a tracker item, and the ADR field
-`decides` is gone with that rule (§7.3.5.2). The ephemeral classes `plans/` and `reviews/`, their filename grammar and
-`status`/`feature` frontmatter, the distillation-and-garbage-collection lifecycle, and
-`docs/archive/`. An ephemeral document is required to state its own status, which §7.3 assigns
-to the tracker; the lifecycle existed to compensate for the fact that nothing invalidates such
-a document, and a tracker provides that for free. What survives is the distillation *duty*
-(§7.3.6): a completed piece of work still has to leave its durable residue behind.
+`decides` is gone with that rule (§7.3.5.2). The ephemeral classes `plans/` and `reviews/`,
+their filename grammar and `status`/`feature` frontmatter, the
+distillation-and-garbage-collection lifecycle, and `docs/archive/`. The frontmatter key
+`updated`: version control dates a file exactly, which made a hand-maintained copy of that
+date derivable content and an unverifiable self-report at once (§4.2.1). An ephemeral
+document is required to state its own status, which §7.3 assigns to the tracker; the
+lifecycle existed to compensate for the fact that nothing invalidates such a document, and a
+tracker provides that for free. What survives is the distillation *duty* (§7.3.6): a
+completed piece of work still has to leave its durable residue behind.
 
 **Migrating from 1.0.** Move open `plans/` and `reviews/` content to the tracker; distil the
 rest and delete the files. Move anything in `docs/archive/` that records a completed event to
-`records/`, renamed `YYYY-MM-DD-slug.md`; delete the remainder. Renumbering: 1.0's section 7.5
-is 2.0's §7.4, and 1.0's section 7.2.3 class list is 2.0's §7.2.6. (Historical numbers are
+`records/`, renamed `YYYY-MM-DD-slug.md`; delete the remainder. Delete `updated:` from every
+context file and read the date out of git instead. Renumbering: 1.0's section 7.5 is 2.0's
+§7.4, and 1.0's section 7.2.3 class list is 2.0's §7.2.6. (Historical numbers are
 written without the section sign, so that a mechanical reference check over this document
 resolves every `§` it finds.)
 
-**Effect on conformance levels.** An L1 or L2 project is unaffected and keeps its level. **An
-L3 project that used the ephemeral classes regresses to L2 until it migrates**: every 1.0 plan
-and review declares its own `status:`, which §7.3.2 now reports, and that finding gates L3. The
-regression is the migration signal, and it clears the moment the files are gone. L3's
-ephemeral-lifecycle clause is simply gone.
+**Effect on conformance levels.** A 1.0 project keeps the level it had. L3's
+ephemeral-lifecycle clause is gone and nothing replaces it, so no level is lost by leaving
+1.0 plans and reviews in place. **The migration signal is a finding, not a demotion**: every
+1.0 plan and review declares its own `status:`, which §7.3.2 reports on every run, so a job
+that runs `--strict` fails until those files are migrated. That is the intended shape. §9
+certifies structure, and which substrate a project keeps its work state in is not a property
+of the tree; a level that moved on it would claim more than the tooling establishes.
 
 **Tooling.** `ads-lint`'s `--stale-days` flag is removed, along with the staleness clock it
 served. A 1.0 invocation that passes it is accepted and ignored, with a deprecation notice, so
-an existing CI job does not break on upgrade.
+an existing CI job does not break on upgrade. Three checks are added, all ungated for the
+reason above: the substrate check (§7.3.2), enforcer resolution (§4.5.2.1) and the glossary
+avoid-list (§7.2.4). Each of them fails `--strict`.

@@ -3,8 +3,9 @@
 
 Validates a project tree against standard/SPEC.md: frontmatter schema, the
 up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy and its class
-naming rules, and the two prose checks the spec invites - time neutrality
-(§4.7.1) and the size floor (§3.4.1). Reports the achieved conformance level
+naming rules, and the prose checks the spec invites - time neutrality (§4.7.1),
+the size floor (§3.4.1), enforcer resolution (§4.5.2.1) and the glossary
+avoid-list (§7.2.4). Reports the achieved conformance level
 (§9) and what blocks the next one.
 
 Zero external dependencies (Python 3.8+ stdlib only). If PyYAML happens to be
@@ -53,6 +54,20 @@ TIME_RE = re.compile(
     r"(?<![\w-])(" + "|".join(t.replace(" ", r"\s+") for t in TIME_TERMS) + r")(?![\w-])",
     re.IGNORECASE,
 )
+
+# §4.5.2.1. A file-shaped enforcer is a path: it has a directory component and a
+# file extension, or it names a directory. `no-restricted-imports`, `terraform
+# plan` and `process.env` are none of those, and a check that fired on them
+# would be dismissed rather than fixed.
+CODE_SPAN_RE = re.compile(r"`([^`\n]+)`")
+LINK_TARGET_RE = re.compile(r"\]\(([^)\s]+)\)")
+PATH_TOKEN_RE = re.compile(r"^[\w@.][\w./+-]*$")
+
+# §7.2.4. Glossary entry heads (`**Term**:`) and their avoid-lists.
+GLOSSARY_TERM_RE = re.compile(r"^\*\*(.+?)\*\*\s*:")
+GLOSSARY_AVOID_RE = re.compile(r"^_Avoid_\s*:", re.IGNORECASE)
+PAREN_RE = re.compile(r"\([^()]*\)")
+QUOTED_RE = re.compile(r'"([^"]+)"')
 
 
 @dataclass
@@ -327,6 +342,18 @@ def is_scaffolding(name):
     return name.lower() == "readme.md" or name.startswith("_")
 
 
+def is_path_shaped(tok):
+    """§4.5.2.1. True for tokens that are meant to name a file or directory in
+    the repository, and false for lint-rule and command names that merely look
+    word-like. Requiring a directory component keeps the check quiet: an
+    enforcer worth linking lives in a `test/` or `policy/` directory."""
+    if not PATH_TOKEN_RE.match(tok) or "/" not in tok:
+        return False
+    if tok.endswith("/"):
+        return True
+    return "." in tok.rsplit("/", 1)[1]
+
+
 def _aslist(v):
     if v is None:
         return []
@@ -373,6 +400,9 @@ class Linter:
         self.root = os.path.abspath(root)
         self.args = args
         self.findings = []
+        self.vocabulary = {}      # §7.2.4: {avoided synonym: canonical term}
+        self.vocab_patterns = {}  # {avoided synonym: compiled whole-word pattern}
+        self.glossary_real = None
 
     def rel(self, p):
         return os.path.relpath(p, self.root)
@@ -393,11 +423,13 @@ class Linter:
                      "--root is not a node: no AGENTS.md here. Point --root at the "
                      "project index, or add one.", "L1")
             return self.findings
-        self.check_nodes(nodes)
-        self.check_graph(nodes)
         index = next((n for n in nodes.values()
                       if n.fm.get("kind") == "project-index"), None)
-        self.check_docs(self._docs_dir(index) if index else None)
+        index_docs = self._docs_dir(index) if index else None
+        self._load_vocabulary(index_docs)
+        self.check_nodes(nodes)
+        self.check_graph(nodes)
+        self.check_docs(index_docs)
         return self.findings
 
     # -- per-node frontmatter & aliases -----------------------------------
@@ -451,6 +483,8 @@ class Linter:
                          f"(< {self.args.min_lines}); absence of content is not "
                          f"conformance - check what §4.6 admits here")
             self._check_time_neutral(n.path, "§4.7.1")
+            self._check_enforcers(n)
+            self._check_vocabulary(n.path)
             self.check_alias(n)
 
     def _body_lines(self, path):
@@ -650,7 +684,11 @@ class Linter:
                     self._check_glossary_placement(full, dirpath, index_docs)
                 self._check_status_frontmatter(full)
                 if parent not in IMMUTABLE_CLASSES:
+                    # §7.2.4 stops at the immutable classes for the same reason
+                    # §4.7.4 does: a dated document cannot be rewritten to say
+                    # something else, so a finding against it has no fix.
                     self._check_time_neutral(full, "§7.1.3")
+                    self._check_vocabulary(full)
         if not saw_adr:
             self.add(INFO, "§7.2.1", self.root,
                      "no docs/adr/ found; major decisions should be ADRs", gate="L3")
@@ -723,25 +761,138 @@ class Linter:
                      f"durable doc declares status: {status!r}; status "
                      "belongs to the tracker, not the repository")
 
-    def _check_time_neutral(self, full, rule):
-        """§4.7.1. Narration of a change, in a document nobody can date."""
+    @staticmethod
+    def _prose_lines(full, strip_code=False):
+        """Yield (file_line_number, text) for the body lines that are prose.
+
+        Frontmatter, fenced code and blockquotes are not: a code sample is not a
+        claim, and a quoted rule may name the very terms it forbids. With
+        `strip_code`, inline code spans and link targets are blanked too, so a
+        check that reasons about words does not trip over an identifier or a
+        path that happens to contain one.
+        """
         try:
             with open(full, encoding="utf-8") as fh:
                 text = fh.read()
         except OSError:
             return
         fm_text, _ = split_frontmatter(text)
-        body = text[text.index(fm_text) + len(fm_text):] if fm_text else text
-        hits, fenced = [], False
-        for line in body.splitlines():
+        if fm_text:
+            cut = text.index(fm_text) + len(fm_text)
+            body, offset = text[cut:], text[:cut].count("\n")
+        else:
+            body, offset = text, 0
+        fenced = False
+        for i, line in enumerate(body.splitlines()):
             stripped = line.lstrip()
             if stripped.startswith("```") or stripped.startswith("~~~"):
                 fenced = not fenced
                 continue
-            if fenced:
-                continue          # a code sample is not prose
-            if stripped.startswith(">"):
-                continue          # a quoted rule may name the terms it forbids
+            if fenced or stripped.startswith(">"):
+                continue
+            if strip_code:
+                line = LINK_TARGET_RE.sub("]()", CODE_SPAN_RE.sub("``", line))
+            yield offset + 1 + i, line
+
+    def _check_enforcers(self, n):
+        """§4.5.2.1. A constraint that names a file which is not there reads as
+        an invariant and is discoverable as fiction only by going to look.
+        Ungated: §9 keeps §4.5 out of the conformance levels."""
+        seen, in_section = set(), False
+        for lineno, line in self._prose_lines(n.path):
+            if line.startswith("## "):
+                in_section = line.strip() == "## Constraints"
+                continue
+            if not in_section:
+                continue
+            for tok in CODE_SPAN_RE.findall(line) + LINK_TARGET_RE.findall(line):
+                tok = tok.strip()
+                if tok in seen or not is_path_shaped(tok):
+                    continue
+                seen.add(tok)
+                joined = os.path.join(n.directory, tok)
+                if not exists_case_sensitive(joined, self.root):
+                    self.add(WARN, "§4.5.2.1", n.path,
+                             f"line {lineno}: constraint names an enforcer that does not "
+                             f"resolve: {tok}{case_note(joined, self.root)}. Point it at a "
+                             f"real file or mark the constraint (unenforced).")
+
+    @staticmethod
+    def _vocab_pattern(syn):
+        """Whole words, one optional plural. `-` counts as a word character so
+        that rejecting "alarm" does not fire on "alarm-free"."""
+        return re.compile(r"(?<![\w-])"
+                          + r"\s+".join(re.escape(w) for w in syn.split())
+                          + r"(s|es)?(?![\w-])", re.IGNORECASE)
+
+    def _load_vocabulary(self, index_docs):
+        """§7.2.4. Read the project's one glossary into {avoided term: canonical
+        term}. A synonym that some other entry makes canonical is dropped: a
+        grep cannot tell which entry a sentence is about, so the term is correct
+        somewhere and reporting it would be noise."""
+        self.vocabulary, self.vocab_patterns = {}, {}
+        if not index_docs:
+            return
+        path = os.path.join(index_docs, "glossary.md")
+        if not os.path.exists(path):
+            return
+        self.glossary_real = os.path.realpath(path)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            return
+        canonical, avoided, term = set(), {}, None
+        i = 0
+        while i < len(lines):
+            head = GLOSSARY_TERM_RE.match(lines[i].strip())
+            if head:
+                term = head.group(1).strip()
+                canonical.add(term.lower())
+            if term and GLOSSARY_AVOID_RE.match(lines[i].strip()):
+                buf, j = [lines[i]], i + 1
+                while (j < len(lines) and lines[j].strip()
+                       and not GLOSSARY_TERM_RE.match(lines[j].strip())):
+                    buf.append(lines[j])
+                    j += 1
+                # The reason for each rejection is parenthesised and may quote a
+                # term of its own; strip the parentheses before reading quotes.
+                text = PAREN_RE.sub(" ", " ".join(buf))
+                while PAREN_RE.search(text):
+                    text = PAREN_RE.sub(" ", text)
+                for syn in QUOTED_RE.findall(text):
+                    syn = syn.strip().lower()
+                    if syn:
+                        avoided.setdefault(syn, term)
+                i = j
+                continue
+            i += 1
+        self.vocabulary = {k: v for k, v in avoided.items() if k not in canonical}
+        self.vocab_patterns = {k: self._vocab_pattern(k) for k in self.vocabulary}
+
+    def _check_vocabulary(self, full):
+        """§7.2.4. The avoid-list is the mechanically checkable half of a
+        glossary, and this is the grep it asks for. Ungated: naming drift is
+        prose, and §9 certifies structure."""
+        if not self.vocabulary:
+            return
+        if os.path.realpath(full) == self.glossary_real:
+            return                # the glossary is where the terms are named
+        hits = {}
+        for lineno, line in self._prose_lines(full, strip_code=True):
+            low = line.lower()
+            for syn, pattern in self.vocab_patterns.items():
+                if syn in low and syn not in hits and pattern.search(line):
+                    hits[syn] = lineno
+        for syn in sorted(hits, key=lambda k: (hits[k], k)):
+            self.add(WARN, "§7.2.4", full,
+                     f"line {hits[syn]}: {syn!r} is on the glossary avoid-list; "
+                     f"the project's term is {self.vocabulary[syn]!r}")
+
+    def _check_time_neutral(self, full, rule):
+        """§4.7.1. Narration of a change, in a document nobody can date."""
+        hits = []
+        for _, line in self._prose_lines(full):
             for m in TIME_RE.finditer(line):
                 if m.group(0).lower() not in hits:
                     hits.append(m.group(0).lower())

@@ -7,7 +7,6 @@ ref:                          # OPTIONAL: only tightly-coupled siblings
 dep:                          # OPTIONAL: upstream this module specifically consumes
   - { id: <dep-id>, at: <path | git URL#file | https URL>, kind: external-doc, hint: <what and why> }
 docs: ./docs
-updated: <YYYY-MM-DD>
 ---
 
 <!--
@@ -28,7 +27,9 @@ principle that holds for one module is a constraint.
 
 ## Constraints
 - <Invariant an agent must respect when changing this module.> <Cite the ADR that governs
-  it.> Enforced by <test, lint rule, or CI job>.
+  it.> Enforced by <lint rule or CI job, named in prose>, or by a file in this repo written
+  as a relative link: [`<test/path.test.ts>`](<test/path.test.ts>) (§4.5.2.1). Mark an
+  invariant with no mechanism `(unenforced)` rather than naming one that is not there.
 
 ## Traps
 <Delete unless you have one. The counter-intuitive fact, stated as fact.>

@@ -12,7 +12,6 @@ tracker:
   kind: <github | gitlab | jira | linear | other>
   hint: <one line. Delete this key only if the project genuinely has no tracker.>
 docs: ./docs
-updated: <YYYY-MM-DD>
 ---
 
 <!--
@@ -41,8 +40,11 @@ responsible for is often the more useful half.>
   the rest>
 
 ## Constraints
-- <Invariant every agent must respect.> <Cite the governing ADR.> Enforced by <test, lint
-  rule, or CI job>.
+- <Invariant every agent must respect.> <Cite the governing ADR.> Enforced by <lint rule or
+  CI job, named in prose>.
+- <Invariant enforced by a file in this repo.> Enforced by [`<test/path.test.ts>`](<test/path.test.ts>)
+  - a file-shaped enforcer is a relative link, so a reader can follow it and a linter can
+  check it (§4.5.2.1). Leave it unpinned: the claim is that the mechanism exists.
 - <Invariant with no mechanism behind it.> (unenforced)
 
 ## Traps

@@ -7,7 +7,6 @@ ref:
 dep:
   - { id: centersight-api, at: https://centersight-api-doc.com, kind: external-doc, hint: REST contract we serve for alert dispatch }
 docs: ./docs
-updated: 2026-09-10
 ---
 
 # functions
@@ -24,9 +23,11 @@ dispatch** (deliver alerts raised by `requira` to email/webhook channels).
 
 ## Constraints
 - **Append-only ingestion:** never update or delete a reading; corrections are new readings.
-  Root ADR-0003; enforced by the store's write-once grant and `test/ingest.contract.test.ts`.
+  Root ADR-0003; enforced by the store's write-once grant and
+  [`test/ingest.contract.test.ts`](test/ingest.contract.test.ts).
 - **Idempotent handlers:** the bus delivers at-least-once; ingestion dedupes on `reading_id`.
-  Module ADR-0001; enforced by `test/ingest.idempotency.test.ts`.
+  Module ADR-0001; enforced by
+  [`test/ingest.idempotency.test.ts`](test/ingest.idempotency.test.ts).
 - **Contracts only:** do not import `requira`/`ui` source; communicate via events or the API.
   Root ADR-0002; enforced by the ESLint `no-restricted-imports` rule.
 - **Persist before publish:** a reading is stored before its event is published. (unenforced)

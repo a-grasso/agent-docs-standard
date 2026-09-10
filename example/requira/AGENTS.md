@@ -5,7 +5,6 @@ up: ../AGENTS.md
 ref:
   - { at: ../functions/AGENTS.md, hint: source of telemetry.ingested events; owns alert dispatch }
 docs: ./docs
-updated: 2026-09-10
 ---
 
 # requira
@@ -23,7 +22,7 @@ Also back-tests rules against historical telemetry.
 ## Constraints
 - **Pure evaluation:** rule evaluation is a pure function of (rule, readings), with no I/O in
   the evaluator, so that back-tests and live runs agree. Module ADR-0001; enforced by
-  `test/purity.test.ts` and the `no-io-in-evaluator` ESLint rule.
+  [`test/purity.test.ts`](test/purity.test.ts) and the `no-io-in-evaluator` ESLint rule.
 - **Contracts only:** consume events, do not import `functions` source. Root ADR-0002;
   enforced by the ESLint `no-restricted-imports` rule.
 

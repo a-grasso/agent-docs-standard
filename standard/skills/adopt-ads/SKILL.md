@@ -20,7 +20,9 @@ what you can, then confirm concisely; only ask the user what you genuinely canno
 - **Additive only.** You create/modify docs (`AGENTS.md`, `CLAUDE.md`, `docs/`). Do **not**
   edit source code or move files around.
 - **Never fabricate.** If you don't know a value (a dep URL, a build command, a constraint),
-  write `<TODO: …>` and list it in the handoff. A wrong pointer is worse than a missing one.
+  **omit it** and list it in the handoff. A wrong pointer is worse than a missing one, and a
+  `TODO` left in a context file is inadmissible content that every future session pays for
+  (SPEC §4.6.3). The handoff is where unknowns go; the file is not.
 - **Idempotent.** Safe to re-run. If a node already has `AGENTS.md`, treat this as
   upgrade/repair — lint first, fill gaps, don't clobber.
 - **Confirm before bulk writes.** Show the plan (which files you'll create) before creating
@@ -150,7 +152,9 @@ unsure whether a dep matters, ask in a batched question rather than guessing.
 
 ## Phase 5 — Scaffold
 
-Read the templates, then write real files (fill placeholders; leave `<TODO>` for unknowns):
+Read the templates, then write real files. The context-file templates are **authoring
+prompts, not forms** (SPEC §4.5.3): delete every heading the node has nothing admissible to
+say under, and delete the guidance comment at the top once the file is real.
 
 1. **Root `AGENTS.md`** from `AGENTS.project-index.md`: set `kind: project-index`, `title`,
    `topology`, `ref:` (every confirmed module), `dep:` (project-level upstreams), `docs: ./docs`.
@@ -159,8 +163,12 @@ Read the templates, then write real files (fill placeholders; leave `<TODO>` for
    Delete the `ref:`/`dep:` line entirely when a node has none - never leave it empty.
 3. **Fill `## Working here` from reality** (brownfield): pull build/test/run commands from
    manifests, `Makefile`/`Justfile`, or CI config.
-   Leave `## Constraints` minimal — capture only invariants the user states or that are obvious
-   from config; don't invent rules.
+   Keep `## Constraints` minimal: capture only invariants the user states or that are obvious
+   from config, and **name the enforcer** for each (the test, lint rule or CI job), or mark it
+   `(unenforced)` (§4.5.2). Don't invent rules.
+   `## Traps` and `## Decisions in force` are worth asking about but never worth inventing;
+   `## Principles` goes on the index only (§4.5.5). Expect different nodes to end up with
+   different section sets - if they all match, they were filled rather than described.
 4. **CLAUDE.md aliases** — in each node directory:
    ```bash
    ln -sf AGENTS.md <node-dir>/CLAUDE.md
@@ -168,14 +176,26 @@ Read the templates, then write real files (fill placeholders; leave `<TODO>` for
    (On Windows checkouts without symlink support, instead write a one-line stub whose entire
    body is `@AGENTS.md` — Claude Code's import line, which auto-loads the target. A plain
    Markdown link is **not** loaded; never duplicate content.)
-5. **docs/ skeleton** at the root (and per module where it earns it):
-   `docs/adr/`, `docs/decisions/`. Create `docs/plans/` and `docs/reviews/` lazily, when a
-   feature actually starts.
+5. **docs/ skeleton** at the root (and per module where it earns it): `docs/adr/` and
+   `docs/decisions/`. Create `docs/records/`, `docs/glossary.md` and `docs/concept/` when the
+   project has something to put in them, not before. There is no `plans/` or `reviews/`
+   class: work in flight belongs to the issue tracker (§7.3). If the repo already has
+   roadmap, backlog, open-question or bug-list documents, say so in the handoff and propose
+   moving them to the tracker - do not silently keep them.
 6. **Seed ADR-0001** at `docs/adr/0001-adopt-agent-docs-standard.md` from `adr.md`, recording the
    decision to adopt ADS and the chosen topology. This is both useful and a worked example of
    the durable record.
 7. **Fold any pre-existing `CLAUDE.md`** content into the new `AGENTS.md` (then replace it with
-   the symlink) — do not silently discard what was there. Show the user the merge.
+   the symlink); do not silently discard what was there. Show the user the merge.
+
+> **Renaming to `AGENTS.md` on macOS or Windows.** `git mv agents.md AGENTS.md` is a no-op on
+> a case-insensitive filesystem: the rename silently does not happen while the content changes
+> underneath it. Go through a temporary name:
+> ```bash
+> git mv agents.md _agents.tmp && git mv _agents.tmp AGENTS.md
+> ```
+> The same filesystem hides miscased pointers - `up: ../agents.md` resolves locally and 404s
+> on Linux CI - so run the linter before trusting a rename.
 
 ## Phase 6 — Verify
 
@@ -186,8 +206,8 @@ python3 <assets>/ads-lint.py --root <root>            # or --json for detail
 ```
 
 Fix every **error** and every **L2/L3-gated warn** you reasonably can (broken pointers, missing
-aliases, un-enumerated modules, malformed docs). Remaining warns that need human input (a
-`<TODO>` dep URL, a size-budget trim) go into the handoff. Re-run until the reported
+aliases, un-enumerated modules, malformed docs). Remaining warns that need human input (an
+unknown dep URL, a size-budget trim) go into the handoff. Re-run until the reported
 conformance level is as high as the inputs allow.
 
 ## Phase 7 — Handoff
@@ -195,7 +215,8 @@ conformance level is as high as the inputs allow.
 Report concisely:
 - **What was created** (file count + the tree of new `AGENTS.md`/`CLAUDE.md`/`docs/`).
 - **Conformance level** achieved (from the linter) and what blocks the next level.
-- **Open `<TODO>`s** the user must fill (usually dep URLs and a few commands).
+- **Open unknowns** the user must fill (usually dep URLs and a few commands), listed here
+  rather than left in the files.
 - **Suggested next steps:** wire `ads-lint` into CI (see the tools README), and capture existing
   tribal knowledge as ADRs over time.
 

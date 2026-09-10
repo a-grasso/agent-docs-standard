@@ -24,9 +24,9 @@ context file (`AGENTS.md`, with a `CLAUDE.md` alias). Those files are wired toge
 **typed, directed graph** using three pointer kinds: `up:` (parent), `ref:` (children /
 related peers), and `dep:` (upstream dependencies, possibly in other repos). An agent that
 lands anywhere in the tree finds the nearest context file, then **traverses the graph on
-demand** to pull exactly the context a task requires. Durable knowledge (ADRs, decisions)
-lives separately from ephemeral working docs (plans, reviews) so the record stays clean and
-the working set stays small.
+demand** to pull exactly the context a task requires. The repository holds durable knowledge
+and the issue tracker holds work: docs describe, issues track, and nothing that states status
+is written into either the context files or `docs/`.
 
 ## Why this exists
 
@@ -39,9 +39,13 @@ The failure modes are predictable:
   window "to be safe," burning budget and burying the signal.
 - **Stale-by-design docs** — a single monolithic doc that nobody can keep current.
 
-ADS attacks all three with **locality** (context sits next to what it describes),
-**progressive disclosure** (small entry points + explicit pointers), and a **clean
-durable/ephemeral split** (so the permanent record is small and trustworthy).
+- **Silent rot** - a document that states status ("in progress", "recently migrated") has no
+  invalidation event a reader can see, so it goes stale and nothing detects it.
+
+ADS attacks all four with **locality** (context sits next to what it describes),
+**progressive disclosure** (small entry points + explicit pointers), an **admissibility test**
+that decides what may occupy a file read on every task, and a **substrate split** that keeps
+work state out of the permanent record entirely.
 
 ## The model at a glance
 
@@ -74,18 +78,19 @@ graph LR
     IDX -- "dep:" --> NGUI
     IDX -- "dep:" --> API
 
-    FN -.-> FND["docs/<br/>adr · decisions<br/>plans* · reviews*"]
-    RQ -.-> RQD["docs/<br/>*ephemeral: feature-scoped"]
+    FN -.-> FND["docs/<br/>adr · decisions · records<br/>glossary · concept"]
+    RQ -.-> RQD["docs/<br/>durable classes only"]
 ```
 
-Each node's `docs/` folder holds the same taxonomy: **durable** (`adr/`, `decisions/`, …)
-and **ephemeral** (`plans/`, `reviews/` — garbage-collected per feature).
+Every class in a node's `docs/` is durable, and each is either **immutable and dated**
+(`adr/`, `decisions/`, `records/`) or **mutable and time-neutral** (everything else). Work in
+flight is not in `docs/` at all; it is in the tracker.
 
 ## Tooling
 
 | Tool | What it does |
 |------|--------------|
-| [`standard/tools/ads-lint.py`](./standard/tools/ads-lint.py) | Zero-dependency conformance linter. Validates the frontmatter, the `up`/`ref`/`dep` graph, alias symlinks, and the docs lifecycle; reports the achieved conformance level. Wire it into CI. See [tools/README](./standard/tools/README.md). |
+| [`standard/tools/ads-lint.py`](./standard/tools/ads-lint.py) | Zero-dependency conformance linter. Validates the frontmatter, the `up`/`ref`/`dep` graph, alias symlinks, and the `docs/` taxonomy; reports the achieved conformance level. Wire it into CI. See [tools/README](./standard/tools/README.md). |
 | [`standard/skills/adopt-ads/`](./standard/skills/adopt-ads/) | A Claude Code skill that sets up (or retrofits) the standard in any repo — detects greenfield/brownfield + topology, discovers modules, interrogates you for `dep:` pointers, scaffolds the files, and verifies with the linter. Install by symlinking it into `~/.claude/skills/`. |
 
 ```bash

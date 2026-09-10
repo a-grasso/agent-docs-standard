@@ -2,9 +2,10 @@
 """ads-lint — conformance linter for the Agent Docs Standard (ADS).
 
 Validates a project tree against standard/SPEC.md: frontmatter schema, the
-up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy, and the
-ephemeral doc lifecycle (stale plan/review detection). Reports the achieved
-conformance level (§9) and what blocks the next one.
+up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy and its class
+naming rules, and the two prose checks the spec invites - time neutrality
+(§4.7.1) and the size floor (§3.4.1). Reports the achieved conformance level
+(§9) and what blocks the next one.
 
 Zero external dependencies (Python 3.8+ stdlib only). If PyYAML happens to be
 installed it is used for frontmatter parsing; otherwise a built-in parser
@@ -12,7 +13,7 @@ handles the ADS frontmatter subset.
 
 Usage:
     ads-lint.py [--root DIR] [--json] [--strict] [--check-remote]
-                [--max-lines N] [--stale-days N]
+                [--max-lines N] [--min-lines N]
 
 Exit code: 1 if any ERROR (or any WARN under --strict), else 0.
 """
@@ -25,15 +26,32 @@ import re
 import subprocess
 import sys
 from dataclasses import dataclass
-from datetime import date
 
 ERROR, WARN, INFO = "error", "warn", "info"
 SKIP_DIRS = {"node_modules", "dist", "build", "target", "vendor", ".venv", "__pycache__"}
 POINTER_KINDS = {"repo", "package", "external-doc"}
 ADR_STATUS = {"proposed", "accepted", "superseded", "deprecated"}
-EPHEMERAL_STATUS = {"draft", "active", "done", "archived"}
 REMOTE_RE = re.compile(r"^(git@|ssh://|https?://|git://)")
-ADR_FILE_RE = re.compile(r"^\d{4}-[a-z0-9][a-z0-9-]*\.md$")
+SLUG = r"[a-z0-9][a-z0-9.-]*"          # §2
+ADR_FILE_RE = re.compile(rf"^\d{{4}}-{SLUG}\.md$")
+RECORD_FILE_RE = re.compile(rf"^\d{{4}}-\d{{2}}-\d{{2}}-{SLUG}\.md$")
+
+# Classes whose documents are immutable and dated (§7.1.3): §4.7 does not
+# reach them, because a dated document's reader can date what it says.
+IMMUTABLE_CLASSES = {"adr", "decisions", "records"}
+
+# §4.7.1. Deliberately excludes now/since/still/new/old/legacy: their innocent
+# uses are common, and a check that fires on every "now" trains its readers to
+# dismiss it. Those remain violations; they are caught by review, not by grep.
+TIME_TERMS = [
+    "currently", "recently", "no longer", "previously", "used to", "formerly",
+    "as of", "we moved", "migrated from", "for now", "temporarily",
+    "going forward", "TODO",
+]
+TIME_RE = re.compile(
+    r"(?<![\w-])(" + "|".join(t.replace(" ", r"\s+") for t in TIME_TERMS) + r")(?![\w-])",
+    re.IGNORECASE,
+)
 
 
 @dataclass
@@ -270,6 +288,12 @@ class Node:
     line_count: int
 
 
+def is_scaffolding(name):
+    """§7.1.4. A README or an `_`-prefixed file helps an author write records;
+    it is not one, so class naming and lifecycle rules do not bind it."""
+    return name.lower() == "readme.md" or name.startswith("_")
+
+
 def _aslist(v):
     if v is None:
         return []
@@ -330,7 +354,9 @@ class Linter:
             return self.findings
         self.check_nodes(nodes)
         self.check_graph(nodes)
-        self.check_docs()
+        index = next((n for n in nodes.values()
+                      if n.fm.get("kind") == "project-index"), None)
+        self.check_docs(self._docs_dir(index) if index else None)
         return self.findings
 
     # -- per-node frontmatter & aliases -----------------------------------
@@ -367,12 +393,18 @@ class Linter:
                 if "topology" in n.fm:
                     self.add(WARN, "§4.2", n.path,
                              "topology belongs on project-index, not module")
-            # size budget
+            # size budget: a ceiling (§3.4) and a floor (§3.4.1)
             if n.line_count > self.args.max_lines:
                 self.add(WARN, "§3.4", n.path,
                          f"context file is {n.line_count} lines "
                          f"(> {self.args.max_lines} budget); move detail into docs/",
                          gate="L3")
+            elif n.line_count < self.args.min_lines:
+                self.add(INFO, "§3.4.1", n.path,
+                         f"context file is {n.line_count} lines "
+                         f"(< {self.args.min_lines}); absence of content is not "
+                         f"conformance - check what §4.6 admits here")
+            self._check_time_neutral(n.path, "§4.7.1")
             self.check_alias(n)
 
     def check_alias(self, n):
@@ -514,28 +546,35 @@ class Linter:
         if ok is False:
             self.add(WARN, "§5.3.3", n.path, f"dep {dep_id} unreachable: {url}")
 
-    # -- docs taxonomy & ephemeral lifecycle ------------------------------
-    def check_docs(self):
+    # -- docs taxonomy ----------------------------------------------------
+    def check_docs(self, index_docs=None):
         saw_adr = False
         for dirpath, dirnames, filenames in os.walk(self.root):
             dirnames[:] = [
                 d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")
             ]
             parent = os.path.basename(dirpath)
+            in_docs = "docs" in os.path.relpath(dirpath, self.root).split(os.sep)
             for f in filenames:
                 if not f.endswith(".md"):
                     continue
                 full = os.path.join(dirpath, f)
+                if in_docs and is_scaffolding(f):
+                    continue          # §7.1.4: class rules bind records only
                 if parent == "adr":
-                    # README.md and _-prefixed files are directory scaffolding, not records
-                    if f.lower() == "readme.md" or f.startswith("_"):
-                        continue
                     saw_adr = True
                     self._check_adr(full, f)
-                elif parent == "plans":
-                    self._check_ephemeral(full, f, "plan")
-                elif parent == "reviews":
-                    self._check_ephemeral(full, f, "review")
+                    continue
+                if parent == "records":
+                    self._check_record(full, f)
+                    continue
+                if not in_docs:
+                    continue
+                if f == "glossary.md":
+                    self._check_glossary_placement(full, dirpath, index_docs)
+                self._check_status_frontmatter(full)
+                if parent not in IMMUTABLE_CLASSES:
+                    self._check_time_neutral(full, "§7.1.3")
         if not saw_adr:
             self.add(INFO, "§7.2.1", self.root,
                      "no docs/adr/ found; major decisions should be ADRs", gate="L3")
@@ -563,34 +602,56 @@ class Linter:
                      f"ADR status must be one of {sorted(ADR_STATUS)} (got {status!r})",
                      gate="L3")
 
-    def _check_ephemeral(self, full, name, cls):
-        if not re.match(rf"^[a-z0-9][a-z0-9-]*-{cls}(-\d+)?\.md$", name):
-            self.add(WARN, "§7.3.3", full,
-                     f"ephemeral filename must be <feature-slug>-{cls}[-N].md",
-                     gate="L3")
-        fm, err = self._read_fm(full)
-        status = fm.get("status")
-        if status not in EPHEMERAL_STATUS:
-            self.add(WARN, "§7.3.3", full,
-                     f"status must be one of {sorted(EPHEMERAL_STATUS)} "
-                     f"(got {status!r})", gate="L3")
-        if not fm.get("feature"):
-            self.add(WARN, "§7.3.3", full, "ephemeral doc missing feature: slug",
-                     gate="L3")
-        # stale check
-        created = str(fm.get("created") or "")
-        if status in ("draft", "active") and created:
-            m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", created)
-            if m:
-                try:
-                    age = (date.today() - date(*map(int, m.groups()))).days
-                except ValueError:
-                    age = None
-                if age is not None and age > self.args.stale_days:
-                    self.add(WARN, "§7.4.2", full,
-                             f"ephemeral doc is {age} days old and still "
-                             f"'{status}' (> {self.args.stale_days}); distill & GC",
-                             gate="L3")
+    def _check_record(self, full, name):
+        """§7.2.3. The date is the filename's job, so the class sorts and every
+        document in it is dated by construction."""
+        if not RECORD_FILE_RE.match(name):
+            self.add(WARN, "§7.2.3", full,
+                     "record filename must be YYYY-MM-DD-slug.md", gate="L3")
+
+    @staticmethod
+    def _docs_dir(node):
+        return os.path.realpath(
+            os.path.join(node.directory, str(node.fm.get("docs") or "./docs")))
+
+    def _check_glossary_placement(self, full, dirpath, index_docs):
+        """§7.2.4. Exactly one glossary, beside the project index, so that one
+        concept has one canonical term across every node."""
+        if index_docs and os.path.realpath(dirpath) != index_docs:
+            self.add(WARN, "§7.2.4", full,
+                     "a project has exactly one glossary, in the project index's "
+                     "docs/; this one is under a module", gate="L3")
+
+    def _check_status_frontmatter(self, full):
+        """§7.3.2. A durable document that states its own status is an issue
+        wearing a document's clothes. `adr/` is exempt: its status is the
+        decision's own lifecycle, not a report on work in flight."""
+        fm, _ = self._read_fm(full)
+        if fm.get("status") is not None:
+            self.add(WARN, "§7.3.2", full,
+                     f"durable doc declares status: {fm['status']!r}; status "
+                     "belongs to the tracker, not the repository", gate="L3")
+
+    def _check_time_neutral(self, full, rule):
+        """§4.7.1. Narration of a change, in a document nobody can date."""
+        try:
+            with open(full, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            return
+        fm_text, _ = split_frontmatter(text)
+        body = text[text.index(fm_text) + len(fm_text):] if fm_text else text
+        hits = []
+        for line in body.splitlines():
+            if line.lstrip().startswith(">"):
+                continue          # a quoted rule may name the terms it forbids
+            m = TIME_RE.search(line)
+            if m and m.group(0).lower() not in hits:
+                hits.append(m.group(0).lower())
+        if hits:
+            self.add(WARN, rule, full,
+                     "time-connotated prose in a document its reader cannot date: "
+                     + ", ".join(f"{h!r}" for h in hits[:5]))
 
 
 def _http_ok(url):
@@ -620,11 +681,11 @@ def conformance(findings):
     l2_block = any(f.gate == "L2" for f in findings)
     l3_block = any(f.gate == "L3" for f in findings)
     if has_error:
-        return "none", "errors present — fix before claiming any level"
+        return "none", "errors present - fix before claiming any level"
     if l2_block:
         return "L1", "graph gaps block L2 (see L2-gated findings)"
     if l3_block:
-        return "L2", "docs/lifecycle gaps block L3 (see L3-gated findings)"
+        return "L2", "docs/ taxonomy gaps block L3 (see L3-gated findings)"
     return "L3", "fully conformant"
 
 
@@ -657,8 +718,8 @@ def main(argv=None):
                     help="verify remote dep targets (git/https); needs network")
     ap.add_argument("--max-lines", type=int, default=200,
                     help="context-file size budget (default: 200)")
-    ap.add_argument("--stale-days", type=int, default=30,
-                    help="age past which an active/draft ephemeral doc is stale")
+    ap.add_argument("--min-lines", type=int, default=20,
+                    help="context-file size floor (default: 20; §3.4.1)")
     ap.add_argument("--no-color", action="store_true")
     args = ap.parse_args(argv)
 

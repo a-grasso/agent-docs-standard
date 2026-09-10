@@ -48,6 +48,8 @@ deliberately leaves unspecified. Every ADS-conformant project is a valid AGENTS.
   describes, and the *tracker*, which tracks work (§7.3).
 - **Record** vs **scaffolding** - a document of a class, versus a file that helps an author
   write one (`README.md`, `_`-prefixed files). Class rules bind records only (§7.1.4).
+- **Slug** - the descriptive part of a filename: lowercase alphanumerics, hyphens and dots,
+  starting with an alphanumeric (`event-schema`, `collector-0.156`).
 
 ---
 
@@ -351,7 +353,8 @@ writing a document of that class encounters its template (§7.4.4).
 ### 7.2 Document classes
 
 7.2.1. **`adr/`** - Architecture Decision Records.
-- Files **MUST** be named `NNNN-slug.md` (zero-padded sequence, e.g. `0007-event-schema.md`).
+- Files **MUST** be named `NNNN-slug.md`: a zero-padded sequence number and a slug (§2),
+  e.g. `0007-event-schema.md`.
 - Each ADR **MUST** carry frontmatter `status: proposed | accepted | superseded | deprecated`.
 - Once `accepted`, an ADR **MUST NOT** be edited except to change its status. A reversal is a
   **new** ADR that references the old one; the old one's status becomes `superseded` with a
@@ -385,8 +388,9 @@ someone needed to edit was a choice that deserved an ADR (§7.4.4).
   drift it caused, an incident and its cause, a completed migration, a benchmark run, a dated
   audit. An event has no alternatives; a decision does. That is the boundary against `adr/`
   and `decisions/`, and it is sharper than the boundary between those two.
-- Files **MUST** be named `YYYY-MM-DD-slug.md`. The date is the filename's job, so that the
-  class sorts chronologically and every document in it is dated by construction.
+- Files **MUST** be named `YYYY-MM-DD-slug.md`: the date the event happened, and a slug
+  (§2), e.g. `2026-09-09-collector-0.155-to-0.156.md`. The date is the filename's job, so
+  that the class sorts chronologically and every document in it is dated by construction.
 - A record **MUST NOT** be edited once written. A correction is a **new** record.
 - Time-connotated prose is **admissible and expected** here: the document is dated, so its
   reader can date every claim in it. §4.7 does not apply (§7.1.3).
@@ -414,10 +418,11 @@ someone needed to edit was a choice that deserved an ADR (§7.4.4).
 - A glossary **MUST NOT** carry implementation detail or decisions. Its scope is naming:
   detail belongs to `AGENTS.md` (§4.5) or a durable class (§7.2.6), decisions to `adr/`
   (§7.2.1). A glossary **SHOULD** state this boundary in its own opening lines.
-- Because nearly every task names some domain concept, the glossary is the one durable
-  document a project index **SHOULD** point to directly (§5.2). It is nonetheless a `docs/`
-  document and **MUST NOT** be inlined into a context file: it grows with the domain, while
-  §3.4 bounds what may be read on every task.
+- The glossary is found **by convention, not by pointer**: it is `glossary.md` in the project
+  index's `docs/`. `ref` carries edges between context files (§5.2.1), and a fixed path needs
+  no edge - an agent that meets an unfamiliar term looks there without being told, exactly as
+  it finds `AGENTS.md` itself. It **MUST NOT** be inlined into a context file: it grows with
+  the domain, while §3.4 bounds what may be read on every task.
 - Generated output that names a domain concept - identifiers, test names, commit messages,
   issue titles, doc prose - **SHOULD** use the glossary's term. A concept absent from the
   glossary is a signal: either language is being invented that the project does not use, or

@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Tests for ads-lint: docs/adr/ checks (§7.2.1) and case-sensitive resolution (§5).
+"""Tests for ads-lint: the docs/ class rules (§7.1.4, §7.2.x), the substrate
+check (§7.3.2), time neutrality (§4.7.1), the size floor (§3.4.1), and
+case-sensitive pointer resolution (§5).
 
 Stdlib only, matching the linter's own zero-dependency constraint. Run with:
 
@@ -85,7 +87,7 @@ class AdrCase(unittest.TestCase):
         _write(os.path.join(self.root, "docs", "adr", name), body)
 
     def lint(self):
-        args = argparse.Namespace(max_lines=200, stale_days=30, check_remote=False)
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
         findings = ads_lint.Linter(self.root, args).run()
         self.assertEqual([f for f in findings if f.level == ads_lint.ERROR], [],
                          f"fixture root should be error-free: {msgs(findings)}")
@@ -182,7 +184,7 @@ class CaseSensitiveResolution(unittest.TestCase):
         self.root = tmp.name
 
     def lint(self):
-        args = argparse.Namespace(max_lines=200, stale_days=30, check_remote=False)
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
         return ads_lint.Linter(self.root, args).run()
 
     def index(self, ref):
@@ -280,6 +282,153 @@ class CaseSensitiveResolution(unittest.TestCase):
         if not os.path.exists(target):
             self.skipTest("case-sensitive filesystem: nothing to disambiguate")
         self.assertIn("case mismatch", self.errors("§5.2")[0].msg)
+
+
+class DocsCase(AdrCase):
+    """Same fixture root, with an ADR present so `saw_adr` is satisfied."""
+
+    def setUp(self):
+        super().setUp()
+        self.adr_file("0001-use-postgres.md")
+
+    def doc(self, relpath, body):
+        _write(os.path.join(self.root, "docs", *relpath.split("/")), body)
+
+
+class ScaffoldingIsTreeWide(DocsCase):
+    """§7.1.4: class rules bind records, not the files that help write them."""
+
+    def test_underscore_file_in_any_class_is_exempt(self):
+        self.doc("records/_template.md", "# Record template\n")
+        self.assertEqual(for_file(self.lint(), "_template.md"), [], msgs(self.lint()))
+
+    def test_class_readme_is_exempt(self):
+        self.doc("records/README.md", "# Records\n\nWhat belongs here.\n")
+        self.assertEqual(for_file(self.lint(), "README.md"), [])
+
+    def test_a_misnamed_record_is_still_flagged(self):
+        self.doc("records/upgrade-notes.md", "# Notes\n")
+        found = for_file(self.lint(), "upgrade-notes.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+
+class RecordNaming(DocsCase):
+    """§7.2.3: the date is the filename's job."""
+
+    def test_dated_filename_is_clean(self):
+        self.doc("records/2026-09-09-collector-0.156.md", "# Upgrade\n")
+        self.assertEqual(for_file(self.lint(), "2026-09-09-collector-0.156.md"), [])
+
+    def test_undated_filename_warns(self):
+        self.doc("records/collector-upgrade.md", "# Upgrade\n")
+        found = for_file(self.lint(), "collector-upgrade.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertIn("YYYY-MM-DD-slug.md", found[0].msg)
+        self.assertEqual(found[0].gate, "L3")
+
+    def test_a_record_may_narrate_time(self):
+        """§7.1.3: a dated document's reader can date what it says."""
+        self.doc("records/2026-09-09-collector-0.156.md",
+                 "# Upgrade\n\nWe previously pinned 0.155; it was recently dropped.\n")
+        self.assertEqual(for_file(self.lint(), "2026-09-09-collector-0.156.md"), [])
+
+    def test_an_adr_may_narrate_time(self):
+        self.adr_file("0002-drop-pinning.md",
+                      "---\nkind: adr\nstatus: accepted\n---\n\n"
+                      "# Drop pinning\n\nWe previously pinned every release.\n")
+        self.assertEqual(for_file(self.lint(), "0002-drop-pinning.md"), [])
+
+
+class TimeNeutrality(DocsCase):
+    """§4.7.1 in context files, §7.1.3 in mutable durable docs."""
+
+    def test_mutable_doc_narrating_a_change_warns(self):
+        self.doc("guides/deploy.md", "# Deploy\n\nWe migrated from Ansible to Nix.\n")
+        found = for_file(self.lint(), "deploy.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.1.3")
+        self.assertIn("migrated from", found[0].msg)
+
+    def test_mutable_doc_stating_current_state_is_clean(self):
+        self.doc("guides/deploy.md", "# Deploy\n\nDeploys run through Nix.\n")
+        self.assertEqual(for_file(self.lint(), "deploy.md"), [])
+
+    def test_context_file_narrating_a_change_warns(self):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               INDEX_AGENTS + "\n## Working here\n\nTests currently run under pytest.\n")
+        found = [f for f in self.lint() if f.rule == "§4.7.1"]
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertIn("currently", found[0].msg)
+
+    def test_a_quoted_rule_may_name_the_terms_it_forbids(self):
+        self.doc("guides/style.md",
+                 "# Style\n\n> Avoid 'currently' and 'no longer'.\n\nState the present.\n")
+        self.assertEqual(for_file(self.lint(), "style.md"), [])
+
+    def test_innocent_terms_do_not_fire(self):
+        """now/since/still/new/old are review-only, by §4.7.1."""
+        self.doc("guides/deploy.md",
+                 "# Deploy\n\nThe new runner is still supported since it "
+                 "knows how to now-cast old jobs.\n")
+        self.assertEqual(for_file(self.lint(), "deploy.md"), [], msgs(self.lint()))
+
+
+class StatusBelongsToTheTracker(DocsCase):
+    """§7.3.2: a doc that states its own status is an issue in disguise."""
+
+    def test_durable_doc_with_status_warns(self):
+        self.doc("guides/rollout.md",
+                 "---\nstatus: active\n---\n\n# Rollout\n\nHow rollout works.\n")
+        found = for_file(self.lint(), "rollout.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.3.2")
+        self.assertEqual(found[0].gate, "L3")
+
+    def test_adr_status_is_exempt(self):
+        """An ADR's status is the decision's lifecycle, not a work report."""
+        self.adr_file("0002-use-nix.md")
+        self.assertEqual(for_file(self.lint(), "0002-use-nix.md"), [])
+
+    def test_doc_without_status_is_clean(self):
+        self.doc("guides/rollout.md", "# Rollout\n\nHow rollout works.\n")
+        self.assertEqual(for_file(self.lint(), "rollout.md"), [])
+
+
+class GlossaryPlacement(DocsCase):
+    """§7.2.4: exactly one glossary, beside the project index."""
+
+    def test_glossary_at_the_index_is_clean(self):
+        self.doc("glossary.md", "# Glossary\n\n**Reading**: a sensor sample.\n")
+        self.assertEqual(for_file(self.lint(), "glossary.md"), [])
+
+    def test_glossary_under_a_module_warns(self):
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"),
+               "---\nkind: module\ntitle: Widgets\nup: ../AGENTS.md\n---\n\n# Widgets\n")
+        _write(os.path.join(self.root, "widgets", "CLAUDE.md"), "@AGENTS.md")
+        _write(os.path.join(self.root, "widgets", "docs", "glossary.md"),
+               "# Glossary\n\n**Widget**: a widget.\n")
+        found = for_file(self.lint(), "glossary.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.4")
+
+
+class SizeFloor(DocsCase):
+    """§3.4.1: absence of content is not conformance."""
+
+    def lint_with(self, min_lines):
+        args = argparse.Namespace(max_lines=200, min_lines=min_lines,
+                                  check_remote=False)
+        return ads_lint.Linter(self.root, args).run()
+
+    def test_short_context_file_is_reported_as_info(self):
+        found = [f for f in self.lint_with(20) if f.rule == "§3.4.1"]
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.INFO)
+        self.assertEqual(found[0].gate, "", "the floor must not gate a level")
+
+    def test_floor_can_be_disabled(self):
+        self.assertEqual([f for f in self.lint_with(0) if f.rule == "§3.4.1"], [])
 
 
 if __name__ == "__main__":

@@ -1,10 +1,10 @@
 ---
 id: ADR-0001
 title: Adopt the Agent Docs Standard in a monorepo
-status: accepted
+status: superseded
 date: 2026-06-02
 supersedes: -
-superseded-by: -
+superseded-by: ADR-0004
 ---
 
 # ADR-0001: Adopt the Agent Docs Standard in a monorepo

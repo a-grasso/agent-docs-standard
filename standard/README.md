@@ -50,17 +50,24 @@ Because the edge is typed, the agent knows *why* it's following a link and *what
 information waits on the other side. This is the difference between a graph an agent can plan
 over and a pile of undifferentiated hyperlinks.
 
-### 4. Durable and ephemeral are different materials
+### 4. Docs describe, issues track
 
-- **Durable** docs (ADRs, decision logs, guides) are the **permanent record** — the answer to
-  *"why is it like this?"* They are small, curated, and long-lived.
-- **Ephemeral** docs (plans, reviews) are **working artifacts** tied to a single feature — the
-  answer to *"what are we doing right now?"* They are numerous, disposable, and short-lived.
+A project keeps knowledge in two substrates, and the boundary between them is load-bearing:
 
-Mixing them is the classic docs-rot trap: the permanent record drowns in transient noise. ADS
-keeps them in separate folders with an explicit lifecycle — ephemeral docs are **distilled**
-into durable ones when a feature lands, then **garbage-collected**. This keeps the durable
-record small enough to trust and cheap enough to load.
+- The **repository** holds durable knowledge - the answer to *"why is it like this?"* Small,
+  curated, long-lived.
+- The **tracker** holds work - the answer to *"what are we doing?"* Status, sequencing,
+  ownership, what is next. None of it belongs in `docs/` or in a context file.
+
+The reason is not tidiness, it is **invalidation**. A tracker item is invalidated by work
+happening, and the tracker is the thing that observes work happening. A document has no such
+observer, so a document that states status has no invalidation event its reader can see: it
+rots silently and nothing detects it. That is the most common form of documentation rot there
+is, and no lifecycle bolted onto the document fixes it.
+
+What still has to happen when work lands is **distillation**: the constraint learned, the
+interface fixed, the decision taken get written into the right durable class. The work's
+*state* stays where it was.
 
 ### 5. Topology- and tool-agnostic
 
@@ -97,7 +104,9 @@ examples:
 | to safely change module *X* | from the index, follow `ref:` → *X*'s `AGENTS.md`; read `X/docs/adr/` for constraints |
 | to understand an upstream dependency | read `dep:`; follow the pointer to the repo's `AGENTS.md` or the external doc URL |
 | to know *why* something is built this way | read the nearest `docs/adr/` and `docs/decisions/` |
-| to start feature *F* | create `docs/plans/F-plan.md` from the template; on completion, write a review, distill decisions into ADRs, delete the plan |
+| to know what a domain term means | read `docs/glossary.md` beside the project index; use its term, and no synonym on its avoid-list |
+| to know what happened during an upgrade or incident | read the dated files in `docs/records/` |
+| to know the state of feature *F* | ask the tracker; it is not in the repository |
 
 The agent never has to *guess* where information lives, and never has to load more than the
 current hop of the graph.

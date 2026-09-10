@@ -5,6 +5,10 @@ status: accepted
 date: 2026-06-09
 supersedes: -
 superseded-by: -
+decides: centersight/platform#88
+normative-in: ../../AGENTS.md
+revisit-when: a module needs a synchronous call to another module that the API cannot serve
+  within its latency budget
 ---
 
 # ADR-0002: Module isolation via published contracts

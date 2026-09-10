@@ -1,6 +1,6 @@
 # Agent Docs Standard (ADS) - Specification
 
-**Version:** 1.0
+**Version:** 1.1
 **Status:** Draft
 
 The key words **MUST**, **MUST NOT**, **REQUIRED**, **SHALL**, **SHOULD**, **SHOULD NOT**,
@@ -19,7 +19,7 @@ project so that AI agents can locate and load relevant context efficiently. It d
 - **node kinds** and the **frontmatter** schema (§4),
 - the **pointer graph** and its three edge types (§5),
 - the **discovery and rooting** algorithm agents use (§6),
-- the **`docs/` taxonomy** and the durable/ephemeral lifecycle (§7),
+- the **`docs/` taxonomy**, and the split between the repository and the tracker (§7),
 - the **agent navigation protocol** (§8),
 - **conformance levels** (§9).
 
@@ -42,10 +42,12 @@ deliberately leaves unspecified. Every ADS-conformant project is a valid AGENTS.
 - **Pointer** - a typed, directed edge from one node to another location, declared in
   frontmatter. One of `up`, `ref`, `dep` (§5).
 - **Pointer graph** - the directed graph formed by all pointers across all nodes.
-- **Durable doc** - a long-lived document (ADR, decision, guide) that is part of the permanent
-  record (§7.2).
-- **Ephemeral doc** - a short-lived, feature-scoped working document (plan, review) subject to
-  garbage collection (§7.3).
+- **Durable doc** - a document in `docs/` (ADR, decision, record, guide). Every document in
+  `docs/` is durable; it is part of the permanent record (§7.2).
+- **Substrate** - one of the two places a project keeps knowledge: the *repository*, which
+  describes, and the *tracker*, which tracks work (§7.3).
+- **Record** vs **scaffolding** - a document of a class, versus a file that helps an author
+  write one (`README.md`, `_`-prefixed files). Class rules bind records only (§7.1.4).
 
 ---
 
@@ -70,9 +72,11 @@ Markdown **body** (§4.5).
 3.4. Context files are **read on every task**; they **MUST** be kept small (a soft budget of
 **~200 lines** is **RECOMMENDED**). Detail belongs in `docs/` (§7), reached by pointer.
 
-3.4.1. The budget has a **floor** as well as a ceiling. A context file of only a few lines is
-evidence that admissible content (§4.6) was never written, not evidence of discipline. Absence
-of content is not conformance.
+3.4.1. The budget has a **floor** as well as a ceiling. A context file whose body is under
+**~20 lines** is evidence that admissible content (§4.6) was never written rather than evidence
+of discipline, and tooling **MAY** report it for review. Absence of content is not conformance.
+The floor is weaker than the ceiling on purpose: a node genuinely can have little to say, while
+no node needs 500 lines to say it.
 
 ---
 
@@ -110,7 +114,7 @@ omitting any that do not apply:
 | `## Constraints` | **RECOMMENDED** | Invariants an agent **MUST** respect, each naming the mechanism that enforces it (§4.5.2); links to governing ADRs. |
 | `## Traps` | OPTIONAL | Things that look correct and are not: the counter-intuitive fact that otherwise costs an agent a wasted attempt. |
 | `## Decisions in force` | OPTIONAL | One line per decision an agent would otherwise undo, each linked to its ADR (§7.2.1) or `decisions/` entry (§7.2.2). |
-| `## Principles` | OPTIONAL, `project-index` only | One line per principle that decides cases no constraint enumerates, each linked to its rationale in `concept/` (§7.2.4). |
+| `## Principles` | OPTIONAL, `project-index` only | One line per principle that decides cases no constraint enumerates, each linked to its rationale in `concept/` (§7.2.5). |
 
 4.5.1. Headings other than these **SHOULD NOT** appear. A section with no admissible content
 (§4.6) **MUST** be omitted rather than retained empty or filled with placeholder text.
@@ -120,10 +124,11 @@ CI job that enforces it. A constraint with no such mechanism **SHOULD** be marke
 `(unenforced)`, so that the difference between an invariant and an aspiration stays visible to
 the reader. Naming the enforcer also makes the constraint checkable: an agent can run it.
 
-4.5.3. A node's section set is determined by what that node has to say. It **MUST NOT** be
-produced by applying a fixed template to every node: template-driven sections force authors to
-fill headings that have no admissible content for that node, which is how derivable filler
-(§4.6.3) enters a project at scale.
+4.5.3. A node's section set is determined by what that node has to say. A template **MAY** be
+used as an authoring prompt; every heading it offers for which the node has no admissible
+content **MUST** then be deleted (§4.5.1). What is forbidden is the uniform outcome, not the
+tool: identical section sets across every node are evidence of headings filled rather than of
+nodes described, and that is how derivable filler (§4.6.3) enters a project at scale.
 
 4.5.4. Off-repo context is carried by `dep` pointers (§5.3), **not** by a body section. Prose
 that lists or narrates dependencies duplicates machine-readable frontmatter and is
@@ -134,7 +139,7 @@ other end, that description belongs in the pointer's `hint` (§5.2.4), not in th
 that holds for only part of a project is a constraint (§4.5.2) and belongs beside its enforcer;
 a principle proper is project-wide, which is why the section is index-only in the same way
 `topology` is (§4.2). Entries **MUST** be one line each and **SHOULD** link their rationale in
-`concept/` (§7.2.4): a principle whose statement needs a paragraph is being argued rather than
+`concept/` (§7.2.5): a principle whose statement needs a paragraph is being argued rather than
 stated, and the argument belongs in the durable document.
 
 > A constraint decides the cases a project enumerated. A principle decides the cases it did
@@ -159,15 +164,11 @@ licenses removal of content that is true and useful**: such content is not delet
 relocated to `docs/` (§7) and reached by pointer, so it is loaded when relevant instead of
 always. A4 decides whether a line will still be worth its cost later.
 
-4.6.2. **Admissible content.** The body **SHOULD** be limited to:
-
-| # | Class | Note |
-|---|-------|------|
-| C1 | Commands | Only those not discoverable from the tree, or whose discoverable form is wrong here. |
-| C2 | Constraints with enforcers | Per §4.5.2. |
-| C3 | Traps | The counter-intuitive fact, stated as fact. |
-| C4 | Decisions in force | One line and a link, not the rationale; the rationale lives in the ADR. |
-| C5 | Purpose and boundary | What this node is, and what it is not responsible for. |
+4.6.2. **Admissible content.** The classes of admissible content are exactly the body
+sections of §4.5, and nothing further: a line that belongs under none of those headings does
+not belong in the file. Two of them are narrower than their heading suggests - a command is
+admissible only where it is not discoverable from the tree or where the discoverable form is
+wrong here, and a decision in force is one line and a link, never the rationale.
 
 4.6.3. **Inadmissible content.** The following **SHOULD NOT** appear:
 
@@ -180,18 +181,22 @@ always. A4 decides whether a line will still be worth its cost later.
 | Generic engineering advice | Not specific to this node (A2). |
 | Aspirations, intentions, and unenforced conventions | Fail A2; if they are rules, give them enforcers (§4.5.2). |
 | Placeholder or `TODO` text | Fails every test, and signals a template (§4.5.3). |
+| Status, sequencing, ownership, what is next | Belongs to the tracker, not the repository (§7.3). |
 | Anything time-connotated | See §4.7. |
 
 4.7. **Time neutrality.** A context file **MUST** describe only the current state of the node.
 Statements about what was formerly true, what has changed, or why something is no longer done
 **MUST NOT** appear.
 
-4.7.1. The following are evidence of a violation and **SHOULD** be reported as findings by
-conformance tooling: `currently`, `recently`, `now`, `still`, `no longer`, `previously`,
-`used to`, `formerly`, `legacy`, `new` or `old` used to contrast two states, `since`,
-`as of`, `we moved`, `migrated from`, `for now`, `temporarily`, and `TODO`. (The word
-`deprecated` remains admissible as a declared ADR `status` (§7.2.1), but not as narration in a
-context file body.)
+4.7.1. The following read as narration of a change and **SHOULD** be reported as findings by
+conformance tooling: `currently`, `recently`, `no longer`, `previously`, `used to`, `formerly`,
+`as of`, `we moved`, `migrated from`, `for now`, `temporarily`, `going forward`, and `TODO`.
+
+Terms whose innocent uses are common - `now`, `since`, `still`, `new`, `old`, `legacy` - are
+deliberately **absent** from that list. They violate §4.7 whenever they date a claim, but a
+check that fires on every appearance of `now` teaches its readers to dismiss it, and a
+dismissed check is worse than none. They are caught by review, not by grep. (`deprecated`
+remains admissible as a declared ADR `status` (§7.2.1), but not as narration in a body.)
 
 4.7.2. Rationale: an agent reading such a statement cannot date it. "Recently migrated to X" is
 indistinguishable from "migrated to X three years ago", and both are indistinguishable from "a
@@ -199,9 +204,13 @@ migration to X is in progress". The reader must then verify the claim against th
 is precisely the cost the context file existed to remove.
 
 4.7.3. Nothing is lost by the rule. Change history is recorded by version control; decision
-history is recorded by `adr/` (§7.2.1) and `decisions/` (§7.2.2), which are dated and
-immutable **by design** (§7.1.3). Removing history from a context file relocates it to the artifacts
-that can carry a date honestly.
+history by `adr/` (§7.2.1) and `decisions/` (§7.2.2); event history by `records/` (§7.2.3).
+All three are dated and immutable **by design** (§7.1.3). Removing history from a context file
+relocates it to the artifacts that can carry a date honestly.
+
+4.7.4. §4.7 governs context files. It reaches every *mutable* document in `docs/` by way of
+§7.1.3, and reaches none of the immutable ones: a dated record may narrate freely, because its
+reader can date what it says.
 
 ---
 
@@ -315,36 +324,77 @@ topologies. Only pointer *target forms* differ (§5.3.3).
 7.1.1. Any node **MAY** have a `docs/` folder (at the path given by `docs`, default `./docs`).
 
 7.1.2. Documents are partitioned by **subfolder**, each subfolder being one document *class*.
-Classes are either **durable** (§7.2) or **ephemeral** (§7.3). The standard defines the classes
-below; projects **MAY** add classes, declaring each as durable or ephemeral.
+Every class is **durable**: `docs/` is the project's permanent record, and work in flight
+belongs to the other substrate (§7.3). The standard defines the classes in §7.2; projects
+**MAY** add classes, subject to §7.1.3 and §7.1.4.
 
-7.1.3. **Time semantics follow mutability.** Every durable document is either *immutable and
-dated* or *mutable and time-neutral*. Its class decides which:
+7.1.3. **Time semantics follow mutability.** Every document is either *immutable and dated* or
+*mutable and time-neutral*. Its class decides which, and a project adding a class **MUST**
+declare which side that class falls on:
 
 | Class | Mutability | Time |
 |-------|------------|------|
-| `adr/` (§7.2.1), `decisions/` (§7.2.2) | immutable once recorded | dated **by design**; these are the project's history |
-| every other durable class (§7.2.3 onward) | edited in place | time-neutral; §4.7 applies |
+| `adr/` (§7.2.1), `decisions/` (§7.2.2) | immutable once recorded | dated **by design**; the project's decision history |
+| `records/` (§7.2.3) | immutable once written | dated **by design**; the project's event history |
+| every other class (§7.2.4 onward) | edited in place | time-neutral; §4.7 applies |
 
 A mutable document that narrates its own history has no reader who can date the narration and
 no mechanism that keeps it true. The history of a mutable document is its diff; the history of
-a decision is an ADR.
+a decision is an ADR; the history of an event is a record.
 
-### 7.2 Durable classes (part of the permanent record)
+7.1.4. **Records and scaffolding.** Within `docs/`, a `README.md` and any file or folder whose
+name begins with `_` (e.g. `_template.md`) is **scaffolding**: a file that helps an author
+write records, rather than a record itself. Class naming, frontmatter and lifecycle rules apply
+to records only. Scaffolding **SHOULD** sit inside the class it serves, so that an author
+writing a document of that class encounters its template (§7.4.4).
+
+### 7.2 Document classes
 
 7.2.1. **`adr/`** - Architecture Decision Records.
 - Files **MUST** be named `NNNN-slug.md` (zero-padded sequence, e.g. `0007-event-schema.md`).
-- A `README.md` and files prefixed `_` (e.g. `_template.md`) **MAY** sit alongside the records
-  as directory scaffolding; the naming and status rules apply only to the records themselves.
 - Each ADR **MUST** carry frontmatter `status: proposed | accepted | superseded | deprecated`.
 - Once `accepted`, an ADR **MUST NOT** be edited except to change its status. A reversal is a
   **new** ADR that references the old one; the old one's status becomes `superseded` with a
   pointer to the successor.
+- Each ADR **SHOULD** additionally carry:
+
+  | Key | Content |
+  |-----|---------|
+  | `decides` | The issue this ADR closes (§7.3.5). The audit trail across the substrate boundary. |
+  | `normative-in` | The mutable document that states this decision as current fact. The ADR holds the rationale; the named document holds the answer, and links back. |
+  | `revisit-when` | A **checkable** condition under which the decision reopens. |
+
+- `normative-in` is what gives §7.4.2 an owner. Without it the rule against writing content
+  twice states a duty and names nobody to discharge it, so two documents may each reasonably
+  believe they own the answer, and disagree.
+- `revisit-when` **MUST** state a condition a reader can evaluate. *"When cost per signal type
+  is measured"* is checkable; *"when we have more data"* is not, and **MUST NOT** be used - a
+  field that degrades into "revisit later" is the same as no field.
+- **Omitting `revisit-when` asserts permanence.** A provisional decision and a settled one look
+  identical the moment they are written down, and immutability then preserves that confusion
+  indefinitely. The field is the only thing that tells them apart, so its absence is a claim,
+  not an oversight.
 
 7.2.2. **`decisions/`** - a lighter-weight decision log for choices too small for an ADR.
-Append-only; entries **SHOULD** be dated.
+Append-only; entries **MUST** be dated. An entry **MUST NOT** be edited once written: an entry
+someone needed to edit was a choice that deserved an ADR (§7.4.4).
 
-7.2.3. **`glossary.md`** - the project's controlled vocabulary (its *ubiquitous language*).
+7.2.3. **`records/`** - dated, immutable records of an event.
+
+- A record states **what happened**, not what was chosen: a dependency upgrade and the API
+  drift it caused, an incident and its cause, a completed migration, a benchmark run, a dated
+  audit. An event has no alternatives; a decision does. That is the boundary against `adr/`
+  and `decisions/`, and it is sharper than the boundary between those two.
+- Files **MUST** be named `YYYY-MM-DD-slug.md`. The date is the filename's job, so that the
+  class sorts chronologically and every document in it is dated by construction.
+- A record **MUST NOT** be edited once written. A correction is a **new** record.
+- Time-connotated prose is **admissible and expected** here: the document is dated, so its
+  reader can date every claim in it. §4.7 does not apply (§7.1.3).
+- Records are the least rot-prone documents a project has, because nothing invalidates a
+  completed event. A record is finished the moment it is written; there is nothing to revisit
+  and nothing to garbage-collect.
+
+7.2.4. **`glossary.md`** - the project's controlled vocabulary (its *ubiquitous language*).
 
 - A project **SHOULD** maintain **exactly one** glossary, in the project index's `docs/`, so
   that one concept has one canonical term across every node.
@@ -362,7 +412,7 @@ Append-only; entries **SHOULD** be dated.
   terms *records* vocabulary; one that names the terms to avoid *prevents drift*, and unlike a
   definition it is mechanically checkable, because an avoid-list is a search pattern.
 - A glossary **MUST NOT** carry implementation detail or decisions. Its scope is naming:
-  detail belongs to `AGENTS.md` (§4.5) or a durable class (§7.2.5), decisions to `adr/`
+  detail belongs to `AGENTS.md` (§4.5) or a durable class (§7.2.6), decisions to `adr/`
   (§7.2.1). A glossary **SHOULD** state this boundary in its own opening lines.
 - Because nearly every task names some domain concept, the glossary is the one durable
   document a project index **SHOULD** point to directly (§5.2). It is nonetheless a `docs/`
@@ -373,7 +423,7 @@ Append-only; entries **SHOULD** be dated.
   glossary is a signal: either language is being invented that the project does not use, or
   the glossary has a real gap and **SHOULD** be extended by the same change.
 
-7.2.4. **`concept/`** - the project's durable design intent: the reasoning that shaped the
+7.2.5. **`concept/`** - the project's durable design intent: the reasoning that shaped the
 system and still governs how it is extended.
 
 - It **SHOULD** cover, in whatever division suits the project: **purpose and drivers** (why the
@@ -382,89 +432,95 @@ system and still governs how it is extended.
   must achieve for its design to be considered met).
 - Files **MAY** be numbered `NN-slug.md` to fix a reading order, so that an agent can load the
   document in the order its argument develops rather than alphabetically.
-- **Planning state MUST NOT appear.** Phasing, roadmaps, risk registers, open-item lists, and
-  any statement of how far the design has been realised describe the project's current
-  *position*, not its *intent*, and `docs/` holds durable knowledge (§7.1.2). Such state
-  belongs to the issue tracker or to an ephemeral class (§7.3), never here.
+- **Planning state MUST NOT appear.** Phasing, roadmaps, risk registers, and open-item lists
+  describe the project's current *position*, not its *intent*. This is not a rule peculiar to
+  `concept/`: it is §7.3 applied to the class where the temptation is strongest, and the
+  destination is the tracker.
 - **Fulfilment MUST NOT be authored.** Criteria state what must be true; how much is true is a
   *measurement*. A measurement written as prose cannot be dated by its reader (§4.7.2), so
-  fulfilment **MUST** be either generated from tests and checks, or recorded as a dated and
-  immutable assessment. It is never a maintained document.
+  fulfilment **MUST** be either generated from tests and checks, or written once as a dated
+  assessment in `records/` (§7.2.3). It is never a maintained document.
 - Description a reader could obtain from the tree - component inventories, module diagrams,
   configuration listings - **SHOULD NOT** appear: it is derivable (A1) and it rots (A4).
 
-7.2.5. Other **RECOMMENDED** durable classes: `guides/` (how-to), `runbooks/` (operational),
+7.2.6. Other **RECOMMENDED** durable classes: `guides/` (how-to), `runbooks/` (operational),
 `references/` (specs, schemas), `domain/` (domain rules and invariants that hold independently
 of any implementation of them).
 
-### 7.3 Ephemeral classes (feature-scoped, garbage-collected)
+### 7.3 Substrates: the repository and the tracker
 
-7.3.1. **`plans/`** - implementation plans for in-flight work.
+7.3.1. Durable knowledge lives in the **repository**. Work lives in the **issue tracker**.
+These are a project's two substrates, and the boundary between them is load-bearing:
 
-7.3.2. **`reviews/`** - reviews of features or changes.
+> **Docs describe. Issues track.**
+> A document never states status. An issue never holds the durable answer.
 
-7.3.3. Ephemeral files **MUST** be named `<feature-slug>-<class>[-<n>].md`
-(e.g. `alert-throttling-plan.md`, `alert-throttling-review-2.md`) and **MUST** carry
-frontmatter:
+7.3.2. Status, sequencing, ownership, and what is next **MUST NOT** appear in `docs/` or in a
+context file. They belong to the tracker. This covers roadmaps, phasing, risk registers,
+open-question lists, bug lists, feature backlogs, and any statement of how far a piece of work
+has got.
 
-```yaml
-status: draft | active | done | archived   # REQUIRED
-feature: alert-throttling                   # REQUIRED - the feature slug
-created: 2026-07-10                         # RECOMMENDED
-```
+7.3.3. Rationale: the two substrates differ in **what invalidates them**. A tracker item is
+invalidated by work happening, and the tracker is the thing that observes work happening. A
+document has no such observer, so a document that states status has no invalidation event its
+reader can see: it rots silently, and nothing detects it. That is the most common form of
+documentation rot there is. The split is the durable-versus-transient axis of §7.1.3 applied
+one level up.
 
-### 7.4 Lifecycle of ephemeral docs
+7.3.4. The tracker **MAY** be any system that observes work - an issue tracker, a board, a
+pull-request queue. A project without one has nowhere to keep work state; it **MUST NOT**
+conclude that `docs/` will do.
 
-7.4.1. When a feature completes, any durable knowledge in its ephemeral docs (decisions,
-learned constraints, interface changes) **MUST** be **distilled** into the appropriate durable
-class (an ADR, a `decisions/` entry, or an update to a module's `AGENTS.md`).
+7.3.5. The substrates reference each other once per decision: an ADR names the issue it closes
+(`decides`, §7.2.1), and the issue links the durable document once one exists. *"Was this ever
+decided?"* is then answerable from either side.
 
-7.4.2. After distillation, the ephemeral docs **SHOULD** be **garbage-collected**: either
-deleted, or moved to `docs/archive/` with `status: archived`. They **MUST NOT** be left as
-`active`/`draft` indefinitely - stale plans mislead agents.
+7.3.6. A document is **not** disqualified by having been produced *from* work. Distilling what
+a completed piece of work established - a constraint learned, an interface fixed, a decision
+taken - into the appropriate class (§7.2) is how durable knowledge is made. What may not cross
+the boundary is the work's *state*.
 
-7.4.3. Rationale: the durable record is what agents load to understand the system; keeping it
-small and free of transient noise is what makes it loadable and trustworthy.
+### 7.4 Routing content to a destination
 
-### 7.5 Routing content to a destination
-
-7.5.1. Sections 3 and 7 define **where** knowledge may live. This section defines **which**
-destination a given piece of knowledge belongs in. Each piece of durable knowledge has exactly
-one home. The following rules **SHOULD** be applied in order; the first that matches wins.
+7.4.1. Sections 3 and 7 define **where** knowledge may live. This section defines **which**
+destination a given piece of knowledge belongs in. Each piece has exactly one home. The
+following rules **SHOULD** be applied in order; the first that matches wins.
 
 | # | If the content is | It belongs in |
 |---|-------------------|---------------|
-| R1 | an invariant, command, trap, or boundary an agent needs on most tasks in a node | that node's `AGENTS.md` (§3, §4.5) |
-| R2 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` (§7.2.1) |
-| R3 | a decision that is thin, cheaply reversible, or was closed without commitment | `docs/decisions/` (§7.2.2) |
-| R4 | explanatory or reference detail needed for a recognisable minority of tasks | the appropriate durable class (§7.2.5), reached by pointer |
-| R5 | specific to work in flight | an ephemeral class (§7.3), subject to the lifecycle in §7.4 |
+| R1 | status, sequencing, ownership, or what is next | the tracker (§7.3) |
+| R2 | an invariant, command, trap, or boundary an agent needs on most tasks in a node | that node's `AGENTS.md` (§3, §4.5) |
+| R3 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` (§7.2.1) |
+| R4 | a decision that is thin, cheaply reversible, or was closed without commitment | `docs/decisions/` (§7.2.2) |
+| R5 | a completed event whose detail is worth keeping | `docs/records/` (§7.2.3) |
+| R6 | explanatory or reference detail needed for a recognisable minority of tasks | the appropriate durable class (§7.2.6), reached by pointer |
 
-7.5.2. Content **MUST NOT** be written to two destinations. Where a second destination needs
+7.4.2. Content **MUST NOT** be written to two destinations. Where a second destination needs
 it, that destination **MUST** link to the first rather than restate it. Two copies of a rule
-are two rules, and they will diverge.
+are two rules, and they will diverge. Where two mutable documents could each reasonably state
+the same fact, the deciding ADR's `normative-in` (§7.2.1) names the one that does.
 
-7.5.3. A rule and the prose describing it are **substitutes, not complements**. When a
+7.4.3. A rule and the prose describing it are **substitutes, not complements**. When a
 constraint gains an enforcer (§4.5.2), the prose arguing for it **SHOULD** be reduced to the
 one-line statement plus the enforcer's name; the argument belongs in the ADR that decided it.
 
-7.5.4. **On checking §7.5.** Routing is a judgment made at the moment content is written, and
+7.4.4. **On checking §7.4.** Routing is a judgment made at the moment content is written, and
 it **cannot be reliably recovered afterwards**: a paragraph that should have been an ADR is not
 distinguishable, after the fact, from a paragraph that belongs where it sits. Conformance
 tooling therefore checks the **taxonomy** (that destinations exist and obey their own rules,
-per §7.1 to §7.4) and **not** the routing. A misroute is nonetheless detectable *indirectly*,
+per §7.1 to §7.3) and **not** the routing. A misroute is nonetheless detectable *indirectly*,
 by the symptom it leaves in the destination that wrongly received it:
 
 | Symptom | Likely misroute |
 |---------|-----------------|
-| A context file over the §3.4 budget | detail that belongs in a durable class (R4) |
-| Time-connotated prose in a context file (§4.7) | rationale that belongs in an ADR (R2) |
-| An ADR of two lines with no rationale | a `decisions/` entry (R3) |
-| An edited `decisions/` entry | a choice that deserved an ADR (R2) |
+| A document stating status, ownership, or what is next | an issue (R1) |
+| A context file over the §3.4 budget | detail that belongs in a durable class (R6) |
+| Time-connotated prose in a mutable document (§4.7) | rationale that belongs in an ADR (R3), or an event that belongs in `records/` (R5) |
+| An ADR of two lines with no rationale | a `decisions/` entry (R4) |
+| An edited `decisions/` entry or record | a choice that deserved an ADR (R3) |
 | A durable doc no context file points to | content that was never routed, only filed |
-| An `active` ephemeral doc older than its feature | a §7.4 distillation that never happened |
 
-Because §7.5 is applied when content is written, it **SHOULD** be reachable from the project
+Because §7.4 is applied when content is written, it **SHOULD** be reachable from the project
 index, so that it governs at authoring time rather than at review time.
 
 ---
@@ -489,19 +545,21 @@ unrelated modules.
 | work inside another module *X* | index `ref` → *X*'s `AGENTS.md` → `X/docs/adr/` |
 | understand a consumed interface/contract | `dep` → target repo's `AGENTS.md` or external doc |
 | *why* is it built this way | nearest `docs/adr/` then `docs/decisions/` |
-| current state of feature *F* | `docs/plans/F-*.md` (ignore `status: archived`) |
+| what happened during an upgrade, incident, or migration | nearest `docs/records/` |
+| what a domain term means | the project index's `docs/glossary.md` |
+| current state of feature *F* | the issue tracker (§7.3), never `docs/` |
 
 8.4. **Respect constraints.** Before changing a node, read its `## Constraints` and the ADRs it
 cites. An `accepted` ADR is binding (§7.2.1).
 
-8.5. **Write to the right place.** When producing durable output, use this decision order:
+8.5. **Write to the right place.** Apply the routing rules of §7.4.1 in order. In short:
+status and plans to the **tracker**; a hard-to-reverse decision to a **new ADR** in the nearest
+owning node's `adr/`; a smaller lasting choice to a **`decisions/`** entry; a completed event
+to **`records/`**; a stable rule about *how to work in this node* to the node's **`AGENTS.md`**.
 
-1. Architectural / hard-to-reverse decision → **new ADR** in the nearest owning node's `adr/`.
-2. Smaller but lasting choice → **`decisions/`** entry.
-3. In-flight planning or a change review → **`plans/`** / **`reviews/`** (ephemeral).
-4. A stable rule about *how to work in this node* → edit the node's **`AGENTS.md`**.
-
-8.6. **Close the loop.** When a feature lands, perform §7.4 distillation and garbage collection.
+8.6. **Close the loop.** When a piece of work lands, distil what it established into the
+appropriate durable class (§7.3.6). The work's *state* stays in the tracker and is not copied
+into `docs/`.
 
 8.7. **Budget.** Prefer the smallest set of hops that answers the task. Every pointer not
 followed is context budget preserved.
@@ -524,13 +582,14 @@ A project **MAY** claim one of three cumulative levels.
 
 **Level 3 - Documented & maintained.**
 - All of L2, plus: the `docs/` taxonomy (§7) is in use; major decisions are captured as ADRs;
-  the ephemeral lifecycle (§7.4) is followed (no stale `active` plans); context files respect
+  every class obeys its own naming and mutability rules (§7.1.3, §7.2); context files respect
   the size budget (§3.4).
 
 > **Levels certify structure, not content.** The body-section requirements (§4.5), enforcer
-> naming (§4.5.2), content admissibility (§4.6), time neutrality (§4.7) and routing (§7.5) are
-> **normative but not certified**. They are properties of prose rather than of the tree, and a
-> level that claimed to verify them would claim more than tooling can establish (§7.5.4).
+> naming (§4.5.2), content admissibility (§4.6), time neutrality (§4.7), the substrate rule
+> (§7.3) and routing (§7.4) are **normative but not certified**. They are properties of prose
+> rather than of the tree, and a level that claimed to verify them would claim more than
+> tooling can establish (§7.4.4).
 > A project **MAY** report them as separately reviewed; it **MUST NOT** present a conformance
 > level as evidence of them.
 
@@ -575,4 +634,42 @@ updated: 2026-07-10
 ---
 ```
 
+```yaml
+# ADR (§7.2.1)
+---
+status: accepted                  # proposed | accepted | superseded | deprecated
+date: 2026-09-09
+decides: acme/platform#412        # the issue this closes
+normative-in: ../references/quota-model.md
+revisit-when: cost per signal type is measured against real traffic
+---
+```
+
 See [`templates/`](./templates/) for full, copy-ready files.
+
+---
+
+## Appendix C - What changed in 1.1
+
+1.1 adds the content half of the standard: 1.0 governed where context files live and how they
+link, and said almost nothing about what they contain.
+
+**New.** Body sections with per-section requirement levels and named enforcers (§4.5); the
+A1-A4 admissibility test (§4.6); time neutrality (§4.7); `records/`, a dated immutable class
+for events (§7.2.3); `glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3);
+routing rules R1-R6 (§7.4); the ADR fields `decides`, `normative-in` and `revisit-when`
+(§7.2.1); a tree-wide scaffolding exemption (§7.1.4), generalised from the `adr/`-only carve-out
+of 1.0.
+
+**Removed.** The ephemeral classes `plans/` and `reviews/`, their filename grammar and
+`status`/`feature` frontmatter, the distillation-and-garbage-collection lifecycle, and
+`docs/archive/`. An ephemeral document is required to state its own status, which §7.3 assigns
+to the tracker; the lifecycle existed to compensate for the fact that nothing invalidates such
+a document, and a tracker provides that for free. What survives is the distillation *duty*
+(§7.3.6): a completed piece of work still has to leave its durable residue behind.
+
+**Migrating from 1.0.** Move open `plans/` and `reviews/` content to the tracker; distil the
+rest and delete the files. Move anything in `docs/archive/` that records a completed event to
+`records/`, renamed `YYYY-MM-DD-slug.md`; delete the remainder. Section §7.5 is now §7.4, and
+the class list §7.2.3 of 1.0 is now §7.2.6. Levels are unaffected: an L2 project stays L2, and
+L3's ephemeral-lifecycle clause is simply gone.

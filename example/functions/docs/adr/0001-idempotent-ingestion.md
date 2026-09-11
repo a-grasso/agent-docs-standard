@@ -3,6 +3,7 @@ id: ADR-0001
 title: Idempotent ingestion keyed on reading_id
 status: accepted
 date: 2026-06-22
+revisit-when: the bus offers exactly-once delivery at the plant edge, not only within a region
 supersedes: -
 superseded-by: -
 ---
@@ -26,5 +27,5 @@ first successful insert.
 - **Follow-ups:** the dedupe index is provisioned in `infra`.
 
 ## Alternatives considered
-- **Best-effort dedupe by (sensor, timestamp)** — rejected: two distinct readings can share a
+- **Best-effort dedupe by (sensor, timestamp)** - rejected: two distinct readings can share a
   millisecond; would silently drop data.

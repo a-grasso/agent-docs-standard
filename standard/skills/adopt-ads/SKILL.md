@@ -13,16 +13,18 @@ description: >-
 # Adopt the Agent Docs Standard
 
 Your job is to bring a target repository into conformance with the Agent Docs Standard (ADS)
-and leave it **lint-clean**. Work in phases. Prefer **inference over interrogation** — detect
+and leave it **lint-clean**. Work in phases. Prefer **inference over interrogation** - detect
 what you can, then confirm concisely; only ask the user what you genuinely cannot determine.
 
 **Guardrails**
 - **Additive only.** You create/modify docs (`AGENTS.md`, `CLAUDE.md`, `docs/`). Do **not**
   edit source code or move files around.
 - **Never fabricate.** If you don't know a value (a dep URL, a build command, a constraint),
-  write `<TODO: …>` and list it in the handoff. A wrong pointer is worse than a missing one.
+  **omit it** and list it in the handoff. A wrong pointer is worse than a missing one, and a
+  `TODO` left in a context file is inadmissible content that every future session pays for
+  (SPEC §4.6.3). The handoff is where unknowns go; the file is not.
 - **Idempotent.** Safe to re-run. If a node already has `AGENTS.md`, treat this as
-  upgrade/repair — lint first, fill gaps, don't clobber.
+  upgrade/repair - lint first, fill gaps, don't clobber.
 - **Confirm before bulk writes.** Show the plan (which files you'll create) before creating
   many files.
 
@@ -41,7 +43,7 @@ Read `references/spec-cheatsheet.md` before scaffolding if you need the exact fr
 
 ---
 
-## Phase 0 — Preflight: target + tooling
+## Phase 0 - Preflight: target + tooling
 
 1. **Target root.** Default to the current working directory. If the user named a path, use it.
    If ambiguous, ask.
@@ -53,7 +55,16 @@ Read `references/spec-cheatsheet.md` before scaffolding if you need the exact fr
 for t in git rg grep python3 gh glab jq; do
   if command -v "$t" >/dev/null 2>&1; then echo "$t: $(command -v "$t")"; else echo "$t: MISSING"; fi
 done
+gh auth status 2>&1 | head -3 || true      # present but unauthenticated still degrades Phase 4
 ```
+
+3. **Tracker check.** Ask which issue tracker the project uses, and capture its URL or
+   `org/repo`. The standard makes it the second substrate (§7.3): status, sequencing and what is
+   next live there and nowhere in the repository. A project with no tracker **MUST NOT**
+   conclude that `docs/` will do (§7.3.4) - if there is none, say so plainly in the handoff and
+   do not invent a home for work state. Record it **once**, as the `tracker` key on the project
+   index (§7.3.5). Do not link tracker items from individual documents: that is forbidden
+   (§7.3.5.2), because a durable document outlives the work that produced it.
 
 | Tool | Used for | If missing |
 |------|----------|-----------|
@@ -62,10 +73,10 @@ done
 | `rg` (or `grep`) | scanning code for dependency references / API URLs | ask the user to name upstream deps |
 | `gh` / `glab` | resolving org repos to canonical clone URLs; `--check-remote` verification | paste dep URLs manually; skip remote checks |
 
-State plainly: ADS itself has **no runtime dependency** — it's Markdown + symlinks. The tools
+State plainly: ADS itself has **no runtime dependency** - it's Markdown + symlinks. The tools
 above only assist *setup* and *verification*.
 
-## Phase 1 — Greenfield or brownfield?
+## Phase 1 - Greenfield or brownfield?
 
 Gather signals, then classify:
 
@@ -78,15 +89,15 @@ find <root> -maxdepth 3 \( -name package.json -o -name pyproject.toml -o -name g
   -o -name Cargo.toml -o -name pom.xml -o -name build.gradle -o -name '*.tf' \) 2>/dev/null
 ```
 
-- **Greenfield** — empty or near-empty, no real source. → scaffold the skeleton; modules are
+- **Greenfield** - empty or near-empty, no real source. → scaffold the skeleton; modules are
   aspirational (create what the user plans, or just the root).
-- **Brownfield** — existing code. → detect structure and *document what exists*.
-- **Already has AGENTS.md/CLAUDE.md** — upgrade/repair. Run the linter first (Phase 6) to see
+- **Brownfield** - existing code. → detect structure and *document what exists*.
+- **Already has AGENTS.md/CLAUDE.md** - upgrade/repair. Run the linter first (Phase 6) to see
   what's missing, then fill only the gaps.
 
 If the signals are mixed, confirm with one `AskUserQuestion`.
 
-## Phase 2 — Topology
+## Phase 2 - Topology
 
 Infer `monorepo` vs `polyrepo`:
 
@@ -97,11 +108,11 @@ Infer `monorepo` vs `polyrepo`:
   git submodules (`.gitmodules`), each with its own `.git`.
 
 Propose the inferred value and confirm. Topology only changes the *form* of cross-boundary
-pointers (in-repo relative paths vs git URLs) — the structure is identical (SPEC §6.3).
+pointers (in-repo relative paths vs git URLs) - the structure is identical (SPEC §6.3).
 
-## Phase 3 — Module boundaries
+## Phase 3 - Module boundaries
 
-**Brownfield** — propose candidate modules, don't guess silently:
+**Brownfield** - propose candidate modules, don't guess silently:
 
 ```bash
 # workspace members, if declared:
@@ -115,10 +126,10 @@ Also look at conventional roots: `services/`, `packages/`, `apps/`, `modules/`, 
 Present the candidate list via `AskUserQuestion` (multiSelect) so the user can confirm, drop, or
 add. Each confirmed module becomes a `module` node; the root becomes the `project-index`.
 
-**Greenfield** — ask what modules they intend (or agree to start with just the root and add
+**Greenfield** - ask what modules they intend (or agree to start with just the root and add
 modules later). Don't over-scaffold empty dirs.
 
-## Phase 4 — Interrogate dependencies (the important part)
+## Phase 4 - Interrogate dependencies (the important part)
 
 For the project and **each module**, determine its upstream `dep:` pointers and *where each
 points*. This is what lets an agent later answer "what do I build on, and where's its doc?".
@@ -128,14 +139,14 @@ points*. This is what lets an agent later answer "what do I build on, and where'
 ```bash
 git -C <root> remote -v                          # canonical origin / sibling repos
 git -C <root> config --file .gitmodules --list 2>/dev/null   # submodule URLs (polyrepo/deps)
-# significant upstreams only — internal shared libs, sibling repos, external APIs:
+# significant upstreams only - internal shared libs, sibling repos, external APIs:
 jq -r '.dependencies // {} | keys[]' <module>/package.json 2>/dev/null   # filter to the ones that matter
 # external API/doc URLs referenced in code:
 rg -oN --no-heading 'https?://[a-zA-Z0-9./_-]*(api|docs?)[a-zA-Z0-9./_-]*' <module> 2>/dev/null | sort -u
 ```
 
 Then for each candidate dependency, resolve the four fields. Use `AskUserQuestion` when a value
-isn't derivable — **ask specifically "where does `<dep>` live / what should its pointer target?"**
+isn't derivable - **ask specifically "where does `<dep>` live / what should its pointer target?"**
 
 | Field | How to fill |
 |-------|-------------|
@@ -148,9 +159,11 @@ Do **not** dump every transitive package into `dep:`. Capture the upstreams a hu
 to reason about: shared internal libraries, sibling services, and external API contracts. When
 unsure whether a dep matters, ask in a batched question rather than guessing.
 
-## Phase 5 — Scaffold
+## Phase 5 - Scaffold
 
-Read the templates, then write real files (fill placeholders; leave `<TODO>` for unknowns):
+Read the templates, then write real files. The context-file templates are **authoring
+prompts, not forms** (SPEC §4.5.3): delete every heading the node has nothing admissible to
+say under, and delete the guidance comment at the top once the file is real.
 
 1. **Root `AGENTS.md`** from `AGENTS.project-index.md`: set `kind: project-index`, `title`,
    `topology`, `ref:` (every confirmed module), `dep:` (project-level upstreams), `docs: ./docs`.
@@ -159,43 +172,89 @@ Read the templates, then write real files (fill placeholders; leave `<TODO>` for
    Delete the `ref:`/`dep:` line entirely when a node has none - never leave it empty.
 3. **Fill `## Working here` from reality** (brownfield): pull build/test/run commands from
    manifests, `Makefile`/`Justfile`, or CI config.
-   Leave `## Constraints` minimal — capture only invariants the user states or that are obvious
-   from config; don't invent rules.
-4. **CLAUDE.md aliases** — in each node directory:
+   Keep `## Constraints` minimal: capture only invariants the user states or that are obvious
+   from config, and **name the enforcer** for each (the test, lint rule or CI job), or mark it
+   `(unenforced)` (§4.5.2). Don't invent rules. Where the enforcer is a file in the repo,
+   write it as a relative Markdown link and check that it resolves - `ads-lint` reports one
+   that does not (§4.5.2.1). Naming a test that is not there is worse than `(unenforced)`.
+   `## Traps` and `## Decisions in force` are worth asking about but never worth inventing;
+   `## Principles` goes on the index only (§4.5.5). Expect different nodes to end up with
+   different section sets - if they all match, they were filled rather than described.
+4. **CLAUDE.md aliases** - in each node directory:
    ```bash
    ln -sf AGENTS.md <node-dir>/CLAUDE.md
    ```
    (On Windows checkouts without symlink support, instead write a one-line stub whose entire
-   body is `@AGENTS.md` — Claude Code's import line, which auto-loads the target. A plain
+   body is `@AGENTS.md` - Claude Code's import line, which auto-loads the target. A plain
    Markdown link is **not** loaded; never duplicate content.)
-5. **docs/ skeleton** at the root (and per module where it earns it):
-   `docs/adr/`, `docs/decisions/`. Create `docs/plans/` and `docs/reviews/` lazily, when a
-   feature actually starts.
+5. **docs/ skeleton** at the root (and per module where it earns it): `docs/adr/` and
+   `docs/decisions/`. Create `docs/records/`, `docs/glossary.md` and `docs/concept/` when the
+   project has something to put in them, not before. Ask, rather than assuming there is
+   nothing: a recent migration, upgrade or incident is a `records/` entry; a term the team
+   argues about is a `glossary.md` entry; a design argument someone keeps re-making belongs in
+   `concept/`. There is no `plans/` or `reviews/` class: work in flight belongs to the issue
+   tracker (§7.3). If the repo already has roadmap, backlog, open-question or bug-list
+   documents, say so in the handoff and propose moving them to the tracker - do not silently
+   keep them.
+
+   **Migrating a 1.0 tree.** If `docs/plans/`, `docs/reviews/` or `docs/archive/` exist, apply
+   SPEC Appendix C and show the user each move before making it: open plan and review content
+   goes to the tracker, and what a completed piece of work established is distilled into the
+   right durable class (a constraint learned to the node's `## Constraints`, a decision to
+   `adr/` or `decisions/`, a completed event to `records/`) before the file is deleted. Anything
+   in `archive/` that records a completed event moves to `records/`, renamed
+   `YYYY-MM-DD-slug.md`; the remainder is deleted. Nothing in the tooling reports a leftover
+   `archive/`, so this is on you.
 6. **Seed ADR-0001** at `docs/adr/0001-adopt-agent-docs-standard.md` from `adr.md`, recording the
    decision to adopt ADS and the chosen topology. This is both useful and a worked example of
    the durable record.
 7. **Fold any pre-existing `CLAUDE.md`** content into the new `AGENTS.md` (then replace it with
-   the symlink) — do not silently discard what was there. Show the user the merge.
+   the symlink); do not silently discard what was there. Show the user the merge.
 
-## Phase 6 — Verify
+> **Renaming to `AGENTS.md` on macOS or Windows.** `git mv agents.md AGENTS.md` is a no-op on
+> a case-insensitive filesystem: the rename silently does not happen while the content changes
+> underneath it. Go through a temporary name:
+> ```bash
+> git mv agents.md _agents.tmp && git mv _agents.tmp AGENTS.md
+> ```
+> The same filesystem hides miscased pointers - `up: ../agents.md` resolves locally and 404s
+> on Linux CI - so run the linter before trusting a rename.
+
+## Phase 6 - Verify
 
 Run the linter and drive it to clean:
 
 ```bash
-python3 <assets>/ads-lint.py --root <root>            # or --json for detail
+python3 <assets>/ads-lint.py --root <root> --strict    # or --json for detail
 ```
 
-Fix every **error** and every **L2/L3-gated warn** you reasonably can (broken pointers, missing
-aliases, un-enumerated modules, malformed docs). Remaining warns that need human input (a
-`<TODO>` dep URL, a size-budget trim) go into the handoff. Re-run until the reported
-conformance level is as high as the inputs allow.
+Use `--strict`. Without it the command exits 0 while warnings stand, and the checks for the
+clauses §9 leaves uncertified (§7.3.2 substrates, §4.7 time neutrality) are ungated, so they
+never move the reported level either - they would pass unnoticed twice over.
 
-## Phase 7 — Handoff
+Fix every **error** and every **warn** you reasonably can, gated or not (broken pointers,
+missing aliases, un-enumerated modules, malformed docs, a durable doc declaring `status:`).
+Remaining warns that need human input (an unknown dep URL, a size-budget trim) go into the
+handoff. Re-run until the reported conformance level is as high as the inputs allow.
+
+Two things the linter cannot see, so check them by hand before reporting success:
+
+- **Placeholder text in scaffolded docs.** There is no filename or content check for
+  `docs/decisions/`, so a half-filled `decision.md` lints clean. Re-read anything you scaffolded
+  and delete what the project could not fill (§4.5.1).
+- **A `docs/archive/` left over from 1.0.** Nothing reports it. See Phase 5.5.
+
+An `INFO §3.4.1` finding on a small module is **advisory and gates nothing**. If the node
+honestly has only a purpose and its commands, leave it short. Padding it to clear the floor
+produces exactly the uniform, heading-filled outcome §4.5.3 forbids.
+
+## Phase 7 - Handoff
 
 Report concisely:
 - **What was created** (file count + the tree of new `AGENTS.md`/`CLAUDE.md`/`docs/`).
 - **Conformance level** achieved (from the linter) and what blocks the next level.
-- **Open `<TODO>`s** the user must fill (usually dep URLs and a few commands).
+- **Open unknowns** the user must fill (usually dep URLs and a few commands), listed here
+  rather than left in the files.
 - **Suggested next steps:** wire `ads-lint` into CI (see the tools README), and capture existing
   tribal knowledge as ADRs over time.
 

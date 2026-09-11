@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""ads-lint — conformance linter for the Agent Docs Standard (ADS).
+"""ads-lint - conformance linter for the Agent Docs Standard (ADS).
 
 Validates a project tree against standard/SPEC.md: frontmatter schema, the
-up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy, and the
-ephemeral doc lifecycle (stale plan/review detection). Reports the achieved
-conformance level (§9) and what blocks the next one.
+up/ref/dep pointer graph, up/ref reciprocity, the docs/ taxonomy and its class
+naming rules, and the prose checks the spec invites - time neutrality (§4.7.1),
+the size floor (§3.4.1), enforcer resolution (§4.5.2.1) and the glossary
+avoid-list (§7.2.4). Reports the achieved conformance level
+(§9) and what blocks the next one.
 
 Zero external dependencies (Python 3.8+ stdlib only). If PyYAML happens to be
 installed it is used for frontmatter parsing; otherwise a built-in parser
@@ -12,7 +14,7 @@ handles the ADS frontmatter subset.
 
 Usage:
     ads-lint.py [--root DIR] [--json] [--strict] [--check-remote]
-                [--max-lines N] [--stale-days N]
+                [--max-lines N] [--min-lines N]
 
 Exit code: 1 if any ERROR (or any WARN under --strict), else 0.
 """
@@ -31,9 +33,41 @@ ERROR, WARN, INFO = "error", "warn", "info"
 SKIP_DIRS = {"node_modules", "dist", "build", "target", "vendor", ".venv", "__pycache__"}
 POINTER_KINDS = {"repo", "package", "external-doc"}
 ADR_STATUS = {"proposed", "accepted", "superseded", "deprecated"}
-EPHEMERAL_STATUS = {"draft", "active", "done", "archived"}
 REMOTE_RE = re.compile(r"^(git@|ssh://|https?://|git://)")
-ADR_FILE_RE = re.compile(r"^\d{4}-[a-z0-9][a-z0-9-]*\.md$")
+SLUG = r"[a-z0-9][a-z0-9.-]*"          # §2
+ADR_FILE_RE = re.compile(rf"^\d{{4}}-{SLUG}\.md$")
+RECORD_FILE_RE = re.compile(rf"^\d{{4}}-\d{{2}}-\d{{2}}-{SLUG}\.md$")
+
+# Classes whose documents are immutable and dated (§7.1.3): §4.7 does not
+# reach them, because a dated document's reader can date what it says.
+IMMUTABLE_CLASSES = {"adr", "decisions", "records"}
+
+# §4.7.1. Deliberately excludes now/since/still/new/old/legacy: their innocent
+# uses are common, and a check that fires on every "now" trains its readers to
+# dismiss it. Those remain violations; they are caught by review, not by grep.
+TIME_TERMS = [
+    "currently", "recently", "no longer", "previously", "used to", "formerly",
+    "as of", "we moved", "migrated from", "for now", "temporarily",
+    "going forward", "TODO",
+]
+TIME_RE = re.compile(
+    r"(?<![\w-])(" + "|".join(t.replace(" ", r"\s+") for t in TIME_TERMS) + r")(?![\w-])",
+    re.IGNORECASE,
+)
+
+# §4.5.2.1. A file-shaped enforcer is a path: it has a directory component and a
+# file extension, or it names a directory. `no-restricted-imports`, `terraform
+# plan` and `process.env` are none of those, and a check that fired on them
+# would be dismissed rather than fixed.
+CODE_SPAN_RE = re.compile(r"`([^`\n]+)`")
+LINK_TARGET_RE = re.compile(r"\]\(([^)\s]+)\)")
+PATH_TOKEN_RE = re.compile(r"^[\w@.][\w./+-]*$")
+
+# §7.2.4. Glossary entry heads (`**Term**:`) and their avoid-lists.
+GLOSSARY_TERM_RE = re.compile(r"^\*\*(.+?)\*\*\s*:")
+GLOSSARY_AVOID_RE = re.compile(r"^_Avoid_\s*:", re.IGNORECASE)
+PAREN_RE = re.compile(r"\([^()]*\)")
+QUOTED_RE = re.compile(r'"([^"]+)"')
 
 
 @dataclass
@@ -42,15 +76,23 @@ class Finding:
     rule: str          # spec section, e.g. "§5.1"
     path: str          # repo-relative file/dir the finding concerns
     msg: str
-    gate: str = ""     # "L1" | "L2" | "L3" — which level this blocks (optional)
+    gate: str = ""     # "L1" | "L2" | "L3" - which level this blocks (optional)
 
 
 # --------------------------------------------------------------------------- #
 # Frontmatter parsing
 # --------------------------------------------------------------------------- #
+def body_line_count(text):
+    """§3.4.1 counts the *body*, not the file: frontmatter is not content."""
+    fm_text, total = split_frontmatter(text)
+    if fm_text is None:
+        return total
+    return len(text[text.index(fm_text) + len(fm_text):].splitlines())
+
+
 def split_frontmatter(text):
     """Return (frontmatter_text_or_None, total_line_count)."""
-    lines = text.splitlines()
+    lines = text.lstrip("\ufeff").splitlines()
     if not lines or lines[0].strip() != "---":
         return None, len(lines)
     for i in range(1, len(lines)):
@@ -173,8 +215,32 @@ def _minimal_parse(fm_text):
             data[key] = _parse_flow_seq(val) if val.startswith("[") else _unquote(val)
             i += 1
             continue
-        # Block value follows.
+        # Block value follows: either a sequence of `- ` items, or a nested
+        # block mapping (`tracker:` then indented `at:`/`kind:`), which §7.3.5
+        # uses and which PyYAML accepts, so the fallback must accept it too.
         i += 1
+        j = i
+        while j < n and not _strip_comment(lines[j]).strip():
+            j += 1
+        if j < n:
+            raw = _strip_comment(lines[j])
+            first, first_ind = raw.strip(), len(raw) - len(raw.lstrip())
+            if first_ind > 0 and not first.startswith("- ") and ":" in first:
+                d, i = {}, j
+                while i < n:
+                    l2 = _strip_comment(lines[i])
+                    if not l2.strip():
+                        i += 1
+                        continue
+                    s2 = l2.strip()
+                    if (len(l2) - len(l2.lstrip())) == 0 or s2.startswith("- ") \
+                            or ":" not in s2:
+                        break
+                    k2, _, v2 = s2.partition(":")
+                    d[k2.strip()] = _unquote(v2)
+                    i += 1
+                data[key] = d
+                continue
         items = []
         while i < n:
             l2 = _strip_comment(lines[i])
@@ -270,6 +336,24 @@ class Node:
     line_count: int
 
 
+def is_scaffolding(name):
+    """§7.1.4. A README or an `_`-prefixed file helps an author write records;
+    it is not one, so class naming and lifecycle rules do not bind it."""
+    return name.lower() == "readme.md" or name.startswith("_")
+
+
+def is_path_shaped(tok):
+    """§4.5.2.1. True for tokens that are meant to name a file or directory in
+    the repository, and false for lint-rule and command names that merely look
+    word-like. Requiring a directory component keeps the check quiet: an
+    enforcer worth linking lives in a `test/` or `policy/` directory."""
+    if not PATH_TOKEN_RE.match(tok) or "/" not in tok:
+        return False
+    if tok.endswith("/"):
+        return True
+    return "." in tok.rsplit("/", 1)[1]
+
+
 def _aslist(v):
     if v is None:
         return []
@@ -316,6 +400,9 @@ class Linter:
         self.root = os.path.abspath(root)
         self.args = args
         self.findings = []
+        self.vocabulary = {}      # §7.2.4: {avoided synonym: canonical term}
+        self.vocab_patterns = {}  # {avoided synonym: compiled whole-word pattern}
+        self.glossary_real = None
 
     def rel(self, p):
         return os.path.relpath(p, self.root)
@@ -328,9 +415,21 @@ class Linter:
         if not nodes:
             self.add(ERROR, "§3.1", self.root, "no AGENTS.md found under root", "L1")
             return self.findings
+        # §3.1/§6.2: the root of the linted tree must be a node itself. Without
+        # this, the walk adopts whatever conformant subtree it finds and reports
+        # it as the whole project, so a non-conformant root passes silently.
+        if not os.path.exists(os.path.join(self.root, "AGENTS.md")):
+            self.add(ERROR, "§3.1", self.root,
+                     "--root is not a node: no AGENTS.md here. Point --root at the "
+                     "project index, or add one.", "L1")
+            return self.findings
+        index = next((n for n in nodes.values()
+                      if n.fm.get("kind") == "project-index"), None)
+        index_docs = self._docs_dir(index) if index else None
+        self._load_vocabulary(index_docs)
         self.check_nodes(nodes)
         self.check_graph(nodes)
-        self.check_docs()
+        self.check_docs(index_docs)
         return self.findings
 
     # -- per-node frontmatter & aliases -----------------------------------
@@ -356,6 +455,7 @@ class Linter:
                 if "up" in n.fm:
                     self.add(ERROR, "§4.2", n.path,
                              "project-index must not declare up", "L1")
+                self._check_tracker(n)
                 topo = n.fm.get("topology")
                 if topo not in ("monorepo", "polyrepo"):
                     self.add(ERROR, "§6.3.1", n.path,
@@ -367,13 +467,52 @@ class Linter:
                 if "topology" in n.fm:
                     self.add(WARN, "§4.2", n.path,
                              "topology belongs on project-index, not module")
-            # size budget
+                if "tracker" in n.fm:
+                    self.add(WARN, "§7.3.5.1", n.path,
+                             "tracker must not appear on a module; it is a property of "
+                             "the project and belongs on the project-index")
+            # size budget: a ceiling (§3.4) and a floor (§3.4.1)
             if n.line_count > self.args.max_lines:
                 self.add(WARN, "§3.4", n.path,
                          f"context file is {n.line_count} lines "
                          f"(> {self.args.max_lines} budget); move detail into docs/",
                          gate="L3")
+            elif self._body_lines(n.path) < self.args.min_lines:
+                self.add(INFO, "§3.4.1", n.path,
+                         f"context file body is {self._body_lines(n.path)} lines "
+                         f"(< {self.args.min_lines}); absence of content is not "
+                         f"conformance - check what §4.6 admits here")
+            self._check_time_neutral(n.path, "§4.7.1")
+            self._check_enforcers(n)
+            self._check_vocabulary(n.path)
             self.check_alias(n)
+
+    def _body_lines(self, path):
+        try:
+            with open(path, encoding="utf-8") as fh:
+                return body_line_count(fh.read())
+        except OSError:
+            return 0
+
+    def _check_tracker(self, n):
+        """§7.3.5. The second substrate needs an address, or §8.3 sends an agent
+        somewhere it cannot name. Ungated: §9 keeps §7.3 out of the levels."""
+        t = n.fm.get("tracker")
+        if t is None:
+            self.add(WARN, "§7.3.5", n.path,
+                     "no tracker declared; §7.3 makes the tracker the second substrate, "
+                     "so §4.2 asks the project index to say where it is")
+            return
+        if not isinstance(t, dict):
+            self.add(WARN, "§7.3.5", n.path,
+                     f"tracker must be a mapping with an 'at' key, got {t!r}")
+            return
+        at = t.get("at")
+        if not at or not isinstance(at, str):
+            self.add(WARN, "§7.3.5", n.path, "tracker missing at: (URL or org/repo)")
+        elif not (REMOTE_RE.match(at) or re.match(r"^[\w.-]+/[\w.-]+$", at)):
+            self.add(WARN, "§7.3.5", n.path,
+                     f"tracker at: {at!r} is neither a URL nor org/repo")
 
     def check_alias(self, n):
         claude = os.path.join(n.directory, "CLAUDE.md")
@@ -386,6 +525,10 @@ class Linter:
             if os.path.basename(tgt) != "AGENTS.md":
                 self.add(WARN, "§3.2", claude,
                          f"CLAUDE.md symlink points to {tgt!r}, not AGENTS.md")
+            elif os.path.realpath(claude) != os.path.realpath(n.path):
+                self.add(WARN, "§3.2", claude,
+                         f"CLAUDE.md symlink target {tgt!r} does not resolve to this "
+                         "node's AGENTS.md (§3.2 requires identical content)")
         else:
             try:
                 with open(claude, encoding="utf-8") as f:
@@ -514,28 +657,38 @@ class Linter:
         if ok is False:
             self.add(WARN, "§5.3.3", n.path, f"dep {dep_id} unreachable: {url}")
 
-    # -- docs taxonomy & ephemeral lifecycle ------------------------------
-    def check_docs(self):
+    # -- docs taxonomy ----------------------------------------------------
+    def check_docs(self, index_docs=None):
         saw_adr = False
         for dirpath, dirnames, filenames in os.walk(self.root):
             dirnames[:] = [
                 d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")
             ]
             parent = os.path.basename(dirpath)
+            in_docs = "docs" in os.path.relpath(dirpath, self.root).split(os.sep)
             for f in filenames:
                 if not f.endswith(".md"):
                     continue
                 full = os.path.join(dirpath, f)
+                if not in_docs:
+                    continue          # §7.1 governs docs/ only
+                if is_scaffolding(f):
+                    continue          # §7.1.4: class rules bind records only
                 if parent == "adr":
-                    # README.md and _-prefixed files are directory scaffolding, not records
-                    if f.lower() == "readme.md" or f.startswith("_"):
-                        continue
                     saw_adr = True
                     self._check_adr(full, f)
-                elif parent == "plans":
-                    self._check_ephemeral(full, f, "plan")
-                elif parent == "reviews":
-                    self._check_ephemeral(full, f, "review")
+                    continue          # §7.3.2: an ADR's status is exempt
+                if parent == "records":
+                    self._check_record(full, f)
+                if f.lower() == "glossary.md":
+                    self._check_glossary_placement(full, dirpath, index_docs)
+                self._check_status_frontmatter(full)
+                if parent not in IMMUTABLE_CLASSES:
+                    # §7.2.4 stops at the immutable classes for the same reason
+                    # §4.7.4 does: a dated document cannot be rewritten to say
+                    # something else, so a finding against it has no fix.
+                    self._check_time_neutral(full, "§7.1.3")
+                    self._check_vocabulary(full)
         if not saw_adr:
             self.add(INFO, "§7.2.1", self.root,
                      "no docs/adr/ found; major decisions should be ADRs", gate="L3")
@@ -563,34 +716,192 @@ class Linter:
                      f"ADR status must be one of {sorted(ADR_STATUS)} (got {status!r})",
                      gate="L3")
 
-    def _check_ephemeral(self, full, name, cls):
-        if not re.match(rf"^[a-z0-9][a-z0-9-]*-{cls}(-\d+)?\.md$", name):
-            self.add(WARN, "§7.3.3", full,
-                     f"ephemeral filename must be <feature-slug>-{cls}[-N].md",
-                     gate="L3")
-        fm, err = self._read_fm(full)
+    def _check_record(self, full, name):
+        """§7.2.3. The date is the filename's job, so the class sorts and every
+        document in it is dated by construction."""
+        if not RECORD_FILE_RE.match(name):
+            self.add(WARN, "§7.2.3", full,
+                     "record filename must be YYYY-MM-DD-slug.md", gate="L3")
+            return
+        try:
+            date.fromisoformat(name[:10])
+        except ValueError:
+            self.add(WARN, "§7.2.3", full,
+                     f"record filename carries {name[:10]!r}, which is not a real "
+                     "calendar date", gate="L3")
+
+    @staticmethod
+    def _docs_dir(node):
+        return os.path.realpath(
+            os.path.join(node.directory, str(node.fm.get("docs") or "./docs")))
+
+    def _check_glossary_placement(self, full, dirpath, index_docs):
+        """§7.2.4. Exactly one glossary, beside the project index, so that one
+        concept has one canonical term across every node."""
+        if index_docs and os.path.realpath(dirpath) != index_docs:
+            self.add(WARN, "§7.2.4", full,
+                     "a project has exactly one glossary, in the project index's "
+                     "docs/; this one is under a module", gate="L3")
+
+    def _check_status_frontmatter(self, full):
+        """§7.3.2. A durable document that states its own status is an issue
+        wearing a document's clothes. `adr/` is exempt (§7.3.2's own carve-out):
+        its status is the decision's own lifecycle, not a report on work in
+        flight. Ungated: §9 places the substrate rule outside the conformance
+        levels, so this reports without certifying."""
+        fm, _ = self._read_fm(full)
         status = fm.get("status")
-        if status not in EPHEMERAL_STATUS:
-            self.add(WARN, "§7.3.3", full,
-                     f"status must be one of {sorted(EPHEMERAL_STATUS)} "
-                     f"(got {status!r})", gate="L3")
-        if not fm.get("feature"):
-            self.add(WARN, "§7.3.3", full, "ephemeral doc missing feature: slug",
-                     gate="L3")
-        # stale check
-        created = str(fm.get("created") or "")
-        if status in ("draft", "active") and created:
-            m = re.match(r"^(\d{4})-(\d{2})-(\d{2})", created)
-            if m:
-                try:
-                    age = (date.today() - date(*map(int, m.groups()))).days
-                except ValueError:
-                    age = None
-                if age is not None and age > self.args.stale_days:
-                    self.add(WARN, "§7.4.2", full,
-                             f"ephemeral doc is {age} days old and still "
-                             f"'{status}' (> {self.args.stale_days}); distill & GC",
-                             gate="L3")
+        # `~`, `null` and an empty value are YAML nulls. PyYAML resolves them to
+        # None and the built-in parser to a string, so normalise or the reported
+        # findings would depend on which parser happened to be installed.
+        if isinstance(status, str) and status.strip().lower() in ("", "~", "null"):
+            status = None
+        if status is not None:
+            self.add(WARN, "§7.3.2", full,
+                     f"durable doc declares status: {status!r}; status "
+                     "belongs to the tracker, not the repository")
+
+    @staticmethod
+    def _prose_lines(full, strip_code=False):
+        """Yield (file_line_number, text) for the body lines that are prose.
+
+        Frontmatter, fenced code and blockquotes are not: a code sample is not a
+        claim, and a quoted rule may name the very terms it forbids. With
+        `strip_code`, inline code spans and link targets are blanked too, so a
+        check that reasons about words does not trip over an identifier or a
+        path that happens to contain one.
+        """
+        try:
+            with open(full, encoding="utf-8") as fh:
+                text = fh.read()
+        except OSError:
+            return
+        fm_text, _ = split_frontmatter(text)
+        if fm_text:
+            cut = text.index(fm_text) + len(fm_text)
+            body, offset = text[cut:], text[:cut].count("\n")
+        else:
+            body, offset = text, 0
+        fenced = False
+        for i, line in enumerate(body.splitlines()):
+            stripped = line.lstrip()
+            if stripped.startswith("```") or stripped.startswith("~~~"):
+                fenced = not fenced
+                continue
+            if fenced or stripped.startswith(">"):
+                continue
+            if strip_code:
+                line = LINK_TARGET_RE.sub("]()", CODE_SPAN_RE.sub("``", line))
+            yield offset + 1 + i, line
+
+    def _check_enforcers(self, n):
+        """§4.5.2.1. A constraint that names a file which is not there reads as
+        an invariant and is discoverable as fiction only by going to look.
+        Ungated: §9 keeps §4.5 out of the conformance levels."""
+        seen, in_section = set(), False
+        for lineno, line in self._prose_lines(n.path):
+            if line.startswith("## "):
+                in_section = line.strip() == "## Constraints"
+                continue
+            if not in_section:
+                continue
+            for tok in CODE_SPAN_RE.findall(line) + LINK_TARGET_RE.findall(line):
+                tok = tok.strip()
+                if tok in seen or not is_path_shaped(tok):
+                    continue
+                seen.add(tok)
+                joined = os.path.join(n.directory, tok)
+                if not exists_case_sensitive(joined, self.root):
+                    self.add(WARN, "§4.5.2.1", n.path,
+                             f"line {lineno}: constraint names an enforcer that does not "
+                             f"resolve: {tok}{case_note(joined, self.root)}. Point it at a "
+                             f"real file or mark the constraint (unenforced).")
+
+    @staticmethod
+    def _vocab_pattern(syn):
+        """Whole words, one optional plural. `-` counts as a word character so
+        that rejecting "alarm" does not fire on "alarm-free"."""
+        return re.compile(r"(?<![\w-])"
+                          + r"\s+".join(re.escape(w) for w in syn.split())
+                          + r"(s|es)?(?![\w-])", re.IGNORECASE)
+
+    def _load_vocabulary(self, index_docs):
+        """§7.2.4. Read the project's one glossary into {avoided term: canonical
+        term}. A synonym that some other entry makes canonical is dropped: a
+        grep cannot tell which entry a sentence is about, so the term is correct
+        somewhere and reporting it would be noise."""
+        self.vocabulary, self.vocab_patterns = {}, {}
+        if not index_docs:
+            return
+        path = os.path.join(index_docs, "glossary.md")
+        if not os.path.exists(path):
+            return
+        self.glossary_real = os.path.realpath(path)
+        try:
+            with open(path, encoding="utf-8") as fh:
+                lines = fh.read().splitlines()
+        except OSError:
+            return
+        canonical, avoided, term = set(), {}, None
+        i = 0
+        while i < len(lines):
+            head = GLOSSARY_TERM_RE.match(lines[i].strip())
+            if head:
+                term = head.group(1).strip()
+                canonical.add(term.lower())
+            if term and GLOSSARY_AVOID_RE.match(lines[i].strip()):
+                buf, j = [lines[i]], i + 1
+                while (j < len(lines) and lines[j].strip()
+                       and not GLOSSARY_TERM_RE.match(lines[j].strip())):
+                    buf.append(lines[j])
+                    j += 1
+                # The reason for each rejection is parenthesised and may quote a
+                # term of its own; strip the parentheses before reading quotes.
+                text = PAREN_RE.sub(" ", " ".join(buf))
+                while PAREN_RE.search(text):
+                    text = PAREN_RE.sub(" ", text)
+                for syn in QUOTED_RE.findall(text):
+                    syn = syn.strip().lower()
+                    if syn:
+                        avoided.setdefault(syn, term)
+                i = j
+                continue
+            i += 1
+        self.vocabulary = {k: v for k, v in avoided.items() if k not in canonical}
+        self.vocab_patterns = {k: self._vocab_pattern(k) for k in self.vocabulary}
+
+    def _check_vocabulary(self, full):
+        """§7.2.4. The avoid-list is the mechanically checkable half of a
+        glossary, and this is the grep it asks for. Ungated: naming drift is
+        prose, and §9 certifies structure."""
+        if not self.vocabulary:
+            return
+        if os.path.realpath(full) == self.glossary_real:
+            return                # the glossary is where the terms are named
+        hits = {}
+        for lineno, line in self._prose_lines(full, strip_code=True):
+            low = line.lower()
+            for syn, pattern in self.vocab_patterns.items():
+                if syn in low and syn not in hits and pattern.search(line):
+                    hits[syn] = lineno
+        for syn in sorted(hits, key=lambda k: (hits[k], k)):
+            self.add(WARN, "§7.2.4", full,
+                     f"line {hits[syn]}: {syn!r} is on the glossary avoid-list; "
+                     f"the project's term is {self.vocabulary[syn]!r}")
+
+    def _check_time_neutral(self, full, rule):
+        """§4.7.1. Narration of a change, in a document nobody can date."""
+        hits = []
+        for _, line in self._prose_lines(full):
+            for m in TIME_RE.finditer(line):
+                if m.group(0).lower() not in hits:
+                    hits.append(m.group(0).lower())
+        if hits:
+            shown = ", ".join(f"{h!r}" for h in hits[:5])
+            more = f" (+{len(hits) - 5} more)" if len(hits) > 5 else ""
+            self.add(WARN, rule, full,
+                     "time-connotated prose in a document its reader cannot date: "
+                     + shown + more)
 
 
 def _http_ok(url):
@@ -620,11 +931,11 @@ def conformance(findings):
     l2_block = any(f.gate == "L2" for f in findings)
     l3_block = any(f.gate == "L3" for f in findings)
     if has_error:
-        return "none", "errors present — fix before claiming any level"
+        return "none", "errors present - fix before claiming any level"
     if l2_block:
         return "L1", "graph gaps block L2 (see L2-gated findings)"
     if l3_block:
-        return "L2", "docs/lifecycle gaps block L3 (see L3-gated findings)"
+        return "L2", "docs/ taxonomy gaps block L3 (see L3-gated findings)"
     return "L3", "fully conformant"
 
 
@@ -645,7 +956,7 @@ def report_text(findings, level, note, use_color):
     ni = sum(f.level == INFO for f in findings)
     print(f"\n{len(findings)} finding(s): {ne} error, {nw} warn, {ni} info")
     print(f"conformance: {c(ERROR if level=='none' else WARN if level!='L3' else INFO)}"
-          f"{level}{c('reset')} — {note}")
+          f"{level}{c('reset')} - {note}")
 
 
 def main(argv=None):
@@ -657,10 +968,19 @@ def main(argv=None):
                     help="verify remote dep targets (git/https); needs network")
     ap.add_argument("--max-lines", type=int, default=200,
                     help="context-file size budget (default: 200)")
-    ap.add_argument("--stale-days", type=int, default=30,
-                    help="age past which an active/draft ephemeral doc is stale")
+    ap.add_argument("--min-lines", type=int, default=20,
+                    help="context-file size floor (default: 20; §3.4.1)")
     ap.add_argument("--no-color", action="store_true")
+    ap.add_argument("--stale-days", type=int, default=None,
+                    help=argparse.SUPPRESS)   # removed in 2.0; accepted, ignored
     args = ap.parse_args(argv)
+
+    if args.stale_days is not None:
+        print("note: --stale-days was removed in ADS 2.0 along with the ephemeral "
+              "classes it served; ignoring it.", file=sys.stderr)
+    if not os.path.isdir(args.root):
+        print(f"error: --root {args.root!r} is not a directory", file=sys.stderr)
+        return 2
 
     findings = Linter(args.root, args).run()
     level, note = conformance(findings)

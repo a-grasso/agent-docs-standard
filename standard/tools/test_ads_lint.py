@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
-"""Tests for ads-lint: docs/adr/ checks (§7.2.1) and case-sensitive resolution (§5).
+"""Tests for ads-lint: the docs/ class rules (§7.1.4, §7.2.x), the substrate
+check (§7.3.2), time neutrality (§4.7.1), the size floor (§3.4.1), and
+case-sensitive pointer resolution (§5).
 
 Stdlib only, matching the linter's own zero-dependency constraint. Run with:
 
@@ -85,7 +87,7 @@ class AdrCase(unittest.TestCase):
         _write(os.path.join(self.root, "docs", "adr", name), body)
 
     def lint(self):
-        args = argparse.Namespace(max_lines=200, stale_days=30, check_remote=False)
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
         findings = ads_lint.Linter(self.root, args).run()
         self.assertEqual([f for f in findings if f.level == ads_lint.ERROR], [],
                          f"fixture root should be error-free: {msgs(findings)}")
@@ -182,7 +184,7 @@ class CaseSensitiveResolution(unittest.TestCase):
         self.root = tmp.name
 
     def lint(self):
-        args = argparse.Namespace(max_lines=200, stale_days=30, check_remote=False)
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
         return ads_lint.Linter(self.root, args).run()
 
     def index(self, ref):
@@ -280,6 +282,479 @@ class CaseSensitiveResolution(unittest.TestCase):
         if not os.path.exists(target):
             self.skipTest("case-sensitive filesystem: nothing to disambiguate")
         self.assertIn("case mismatch", self.errors("§5.2")[0].msg)
+
+
+class DocsCase(AdrCase):
+    """Same fixture root, with an ADR present so `saw_adr` is satisfied."""
+
+    def setUp(self):
+        super().setUp()
+        self.adr_file("0001-use-postgres.md")
+
+    def doc(self, relpath, body):
+        _write(os.path.join(self.root, "docs", *relpath.split("/")), body)
+
+
+class ScaffoldingIsTreeWide(DocsCase):
+    """§7.1.4: class rules bind records, not the files that help write them."""
+
+    def test_underscore_file_in_any_class_is_exempt(self):
+        self.doc("records/_template.md", "# Record template\n")
+        self.assertEqual(for_file(self.lint(), "_template.md"), [], msgs(self.lint()))
+
+    def test_class_readme_is_exempt(self):
+        self.doc("records/README.md", "# Records\n\nWhat belongs here.\n")
+        self.assertEqual(for_file(self.lint(), "README.md"), [])
+
+    def test_a_misnamed_record_is_still_flagged(self):
+        self.doc("records/upgrade-notes.md", "# Notes\n")
+        found = for_file(self.lint(), "upgrade-notes.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+
+class RecordNaming(DocsCase):
+    """§7.2.3: the date is the filename's job."""
+
+    def test_dated_filename_is_clean(self):
+        self.doc("records/2026-09-09-collector-0.156.md", "# Upgrade\n")
+        self.assertEqual(for_file(self.lint(), "2026-09-09-collector-0.156.md"), [])
+
+    def test_undated_filename_warns(self):
+        self.doc("records/collector-upgrade.md", "# Upgrade\n")
+        found = for_file(self.lint(), "collector-upgrade.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertIn("YYYY-MM-DD-slug.md", found[0].msg)
+        self.assertEqual(found[0].gate, "L3")
+
+    def test_a_record_may_narrate_time(self):
+        """§7.1.3: a dated document's reader can date what it says."""
+        self.doc("records/2026-09-09-collector-0.156.md",
+                 "# Upgrade\n\nWe previously pinned 0.155; it was recently dropped.\n")
+        self.assertEqual(for_file(self.lint(), "2026-09-09-collector-0.156.md"), [])
+
+    def test_an_adr_may_narrate_time(self):
+        self.adr_file("0002-drop-pinning.md",
+                      "---\nkind: adr\nstatus: accepted\n---\n\n"
+                      "# Drop pinning\n\nWe previously pinned every release.\n")
+        self.assertEqual(for_file(self.lint(), "0002-drop-pinning.md"), [])
+
+
+class TimeNeutrality(DocsCase):
+    """§4.7.1 in context files, §7.1.3 in mutable durable docs."""
+
+    def test_mutable_doc_narrating_a_change_warns(self):
+        self.doc("guides/deploy.md", "# Deploy\n\nWe migrated from Ansible to Nix.\n")
+        found = for_file(self.lint(), "deploy.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.1.3")
+        self.assertIn("migrated from", found[0].msg)
+
+    def test_mutable_doc_stating_current_state_is_clean(self):
+        self.doc("guides/deploy.md", "# Deploy\n\nDeploys run through Nix.\n")
+        self.assertEqual(for_file(self.lint(), "deploy.md"), [])
+
+    def test_context_file_narrating_a_change_warns(self):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               INDEX_AGENTS + "\n## Working here\n\nTests currently run under pytest.\n")
+        found = [f for f in self.lint() if f.rule == "§4.7.1"]
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertIn("currently", found[0].msg)
+
+    def test_a_quoted_rule_may_name_the_terms_it_forbids(self):
+        self.doc("guides/style.md",
+                 "# Style\n\n> Avoid 'currently' and 'no longer'.\n\nState the present.\n")
+        self.assertEqual(for_file(self.lint(), "style.md"), [])
+
+    def test_innocent_terms_do_not_fire(self):
+        """now/since/still/new/old are review-only, by §4.7.1."""
+        self.doc("guides/deploy.md",
+                 "# Deploy\n\nThe new runner is still supported since it "
+                 "knows how to now-cast old jobs.\n")
+        self.assertEqual(for_file(self.lint(), "deploy.md"), [], msgs(self.lint()))
+
+
+class StatusBelongsToTheTracker(DocsCase):
+    """§7.3.2: a doc that states its own status is an issue in disguise."""
+
+    def test_durable_doc_with_status_warns(self):
+        self.doc("guides/rollout.md",
+                 "---\nstatus: active\n---\n\n# Rollout\n\nHow rollout works.\n")
+        found = for_file(self.lint(), "rollout.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.3.2")
+        self.assertEqual(found[0].gate, "",
+                         "§9 places §7.3 outside the conformance levels, so the "
+                         "substrate check must report without gating one")
+
+    def test_yaml_null_status_is_not_a_status(self):
+        """`~` is a null. Findings must not depend on which parser is installed."""
+        self.doc("guides/a.md", "---\nstatus: ~\n---\n\n# A\n\nText.\n")
+        self.assertEqual(for_file(self.lint(), "a.md"), [])
+
+    def test_adr_status_is_exempt(self):
+        """An ADR's status is the decision's lifecycle, not a work report."""
+        self.adr_file("0002-use-nix.md")
+        self.assertEqual(for_file(self.lint(), "0002-use-nix.md"), [])
+
+    def test_doc_without_status_is_clean(self):
+        self.doc("guides/rollout.md", "# Rollout\n\nHow rollout works.\n")
+        self.assertEqual(for_file(self.lint(), "rollout.md"), [])
+
+
+class GlossaryPlacement(DocsCase):
+    """§7.2.4: exactly one glossary, beside the project index."""
+
+    def test_glossary_at_the_index_is_clean(self):
+        self.doc("glossary.md", "# Glossary\n\n**Reading**: a sensor sample.\n")
+        self.assertEqual(for_file(self.lint(), "glossary.md"), [])
+
+    def test_glossary_under_a_module_warns(self):
+        _write(os.path.join(self.root, "widgets", "AGENTS.md"),
+               "---\nkind: module\ntitle: Widgets\nup: ../AGENTS.md\n---\n\n# Widgets\n")
+        _write(os.path.join(self.root, "widgets", "CLAUDE.md"), "@AGENTS.md")
+        _write(os.path.join(self.root, "widgets", "docs", "glossary.md"),
+               "# Glossary\n\n**Widget**: a widget.\n")
+        found = for_file(self.lint(), "glossary.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.4")
+
+
+class SizeFloor(DocsCase):
+    """§3.4.1: absence of content is not conformance."""
+
+    def lint_with(self, min_lines):
+        args = argparse.Namespace(max_lines=200, min_lines=min_lines,
+                                  check_remote=False)
+        return ads_lint.Linter(self.root, args).run()
+
+    def test_short_context_file_is_reported_as_info(self):
+        found = [f for f in self.lint_with(20) if f.rule == "§3.4.1"]
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.INFO)
+        self.assertEqual(found[0].gate, "", "the floor must not gate a level")
+
+    def test_floor_can_be_disabled(self):
+        self.assertEqual([f for f in self.lint_with(0) if f.rule == "§3.4.1"], [])
+
+
+class RootMustBeANode(unittest.TestCase):
+    """§3.1/§6.2: --root is the project index, not "wherever a node turns up".
+
+    Without this the walk adopts any conformant subtree and reports it as the
+    whole project, so a non-conformant root passes with a clean bill of health.
+    """
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp, True)
+
+    def lint(self):
+        args = argparse.Namespace(root=self.tmp, max_lines=200, min_lines=20,
+                                  check_remote=False)
+        return ads_lint.Linter(self.tmp, args).run()
+
+    def test_conformant_subtree_does_not_certify_the_root(self):
+        _write(os.path.join(self.tmp, "example", "AGENTS.md"), INDEX_AGENTS)
+        found = [f for f in self.lint() if f.rule == "§3.1"]
+        self.assertTrue(found, "a root with no AGENTS.md must be an error")
+        self.assertEqual(found[0].level, ads_lint.ERROR)
+        self.assertEqual(ads_lint.conformance(self.lint())[0], "none")
+
+    def test_root_with_a_node_is_fine(self):
+        _write(os.path.join(self.tmp, "AGENTS.md"), INDEX_AGENTS)
+        self.assertEqual([f for f in self.lint() if f.rule == "§3.1"], [])
+
+
+class ClassRulesBindDocsOnly(DocsCase):
+    """§7.1.4 is scoped "Within `docs/`" - source folders are not classes."""
+
+    def test_adr_named_source_folder_is_not_an_adr_class(self):
+        _write(os.path.join(self.root, "src", "adr", "notes.md"), "# notes\n")
+        _write(os.path.join(self.root, "src", "adr", "README.md"), "# readme\n")
+        self.assertEqual(for_file(self.lint(), "notes.md"), [])
+        self.assertEqual(for_file(self.lint(), "README.md"), [])
+
+    def test_records_named_source_folder_is_not_a_records_class(self):
+        _write(os.path.join(self.root, "pkg", "records", "store.md"), "# store\n")
+        self.assertEqual(for_file(self.lint(), "store.md"), [])
+
+
+class RecordDatesAreReal(DocsCase):
+    """§7.2.3: the date is the filename's job, so it has to be a date."""
+
+    def test_impossible_date_is_reported(self):
+        self.doc("records/2026-99-99-x.md", "# x\n")
+        found = for_file(self.lint(), "2026-99-99-x.md")
+        self.assertTrue(found, "99-99 is not a calendar date")
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+    def test_real_date_passes(self):
+        self.doc("records/2026-08-14-bus-partition.md", "# incident\n")
+        self.assertEqual(for_file(self.lint(), "2026-08-14-bus-partition.md"), [])
+
+
+class TimeNeutralityReporting(DocsCase):
+    """§4.7.1 in a mutable class (§7.1.3)."""
+
+    def test_every_term_on_a_line_is_reported(self):
+        self.doc("guides/g.md",
+                 "# G\n\nWe recently moved and previously it was formerly fine.\n")
+        found = for_file(self.lint(), "g.md")
+        self.assertTrue(found)
+        self.assertIn("recently", found[0].msg)
+        self.assertIn("previously", found[0].msg)
+        self.assertIn("formerly", found[0].msg)
+
+    def test_fenced_code_is_not_prose(self):
+        self.doc("guides/h.md",
+                 "# H\n\n```sh\n# TODO: currently broken\n```\n\nStable text.\n")
+        self.assertEqual(for_file(self.lint(), "h.md"), [])
+
+
+class SizeFloorCountsTheBody(unittest.TestCase):
+    """§3.4.1 says "body", so pointer-heavy frontmatter must not mask an empty one."""
+
+    def test_long_frontmatter_does_not_clear_the_floor(self):
+        refs = "\n".join(f"  - m{i}/AGENTS.md" for i in range(20))
+        text = f"---\nkind: project-index\ntopology: monorepo\nref:\n{refs}\n---\n\n# P\n"
+        self.assertLess(ads_lint.body_line_count(text), 20)
+        self.assertGreater(len(text.splitlines()), 20)
+
+
+class BomDoesNotBreakFrontmatter(unittest.TestCase):
+    """A byte-order mark must not read as "no frontmatter"."""
+
+    def test_bom_prefixed_frontmatter_parses(self):
+        fm, _ = ads_lint.split_frontmatter("\ufeff---\nkind: module\n---\n\n# M\n")
+        self.assertIsNotNone(fm)
+        self.assertIn("kind: module", fm)
+
+
+class TrackerIsAddressedOnce(unittest.TestCase):
+    """§7.3.5. A standard built on typed pointers cannot leave its second
+    substrate unaddressed, and it is a project property, so it appears once."""
+
+    def setUp(self):
+        self.tmp = tempfile.mkdtemp()
+        self.addCleanup(__import__("shutil").rmtree, self.tmp, True)
+
+    def lint(self):
+        args = argparse.Namespace(root=self.tmp, max_lines=200, min_lines=0,
+                                  check_remote=False)
+        return ads_lint.Linter(self.tmp, args).run()
+
+    def _index(self, extra=""):
+        _write(os.path.join(self.tmp, "AGENTS.md"),
+               "---\nkind: project-index\ntopology: monorepo\n" + extra + "---\n\n# P\n")
+
+    def _t(self):
+        return [f for f in self.lint() if f.rule.startswith("\u00a77.3.5")]
+
+    def test_missing_tracker_is_reported(self):
+        self._index()
+        self.assertTrue(self._t(), "an index with no tracker should be reported")
+
+    def test_url_tracker_passes(self):
+        self._index("tracker:\n  at: https://github.com/acme/p/issues\n  kind: github\n")
+        self.assertEqual(self._t(), [], msgs(self.lint()))
+
+    def test_org_repo_tracker_passes(self):
+        self._index("tracker:\n  at: acme/platform\n")
+        self.assertEqual(self._t(), [], msgs(self.lint()))
+
+    def test_nonsense_target_is_reported(self):
+        self._index("tracker:\n  at: somewhere\n")
+        self.assertTrue(self._t())
+
+    def test_tracker_never_gates_a_level(self):
+        """\u00a79 keeps the substrate rule out of the conformance levels."""
+        self._index()
+        self.assertTrue(all(f.gate == "" for f in self._t()))
+
+    def test_module_must_not_declare_one(self):
+        self._index("tracker:\n  at: acme/p\nref:\n  - m/AGENTS.md\n")
+        _write(os.path.join(self.tmp, "m", "AGENTS.md"),
+               "---\nkind: module\nup: ../AGENTS.md\ntracker:\n  at: acme/p\n---\n\n# M\n")
+        self.assertTrue([f for f in self.lint() if f.rule == "\u00a77.3.5.1"])
+
+
+class FallbackParserHandlesNestedMaps(unittest.TestCase):
+    """The built-in parser must accept what PyYAML accepts, or a project's
+    findings depend on whether PyYAML happens to be installed."""
+
+    def test_nested_block_mapping(self):
+        d = ads_lint._minimal_parse(
+            "kind: project-index\ntracker:\n  at: acme/p\n  kind: github\ndocs: ./docs\n")
+        self.assertEqual(d["tracker"], {"at": "acme/p", "kind": "github"})
+        self.assertEqual(d["docs"], "./docs")
+
+    def test_block_sequence_still_works(self):
+        d = ads_lint._minimal_parse("ref:\n  - { at: a/AGENTS.md }\n  - b/AGENTS.md\n")
+        self.assertEqual(d["ref"], [{"at": "a/AGENTS.md"}, "b/AGENTS.md"])
+
+
+class EnforcerCase(unittest.TestCase):
+    """§4.5.2.1. A file-shaped enforcer named under `## Constraints` has to be
+    a file that is there."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+
+    def index(self, constraints, working="- **Build:** `make`\n"):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               "---\nkind: project-index\ntopology: monorepo\n---\n\n"
+               "# Fixture\n\n## Purpose\nA fixture.\n\n"
+               f"## Working here\n{working}\n## Constraints\n{constraints}")
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
+        return [f for f in ads_lint.Linter(self.root, args).run()
+                if f.rule == "§4.5.2.1"]
+
+    def test_resolving_enforcer_is_clean(self):
+        _write(os.path.join(self.root, "test", "purity.test.ts"), "// enforcer\n")
+        self.index("- **Pure:** no I/O. Enforced by `test/purity.test.ts`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_missing_enforcer_warns_ungated(self):
+        self.index("- **Pure:** no I/O. Enforced by `test/purity.test.ts`.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.WARN)
+        self.assertEqual(found[0].gate, "", "§9 keeps §4.5 out of the levels")
+        self.assertIn("test/purity.test.ts", found[0].msg)
+
+    def test_link_form_is_checked_once(self):
+        self.index("- **Pure:** enforced by "
+                   "[`test/purity.test.ts`](test/purity.test.ts).\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+
+    def test_rule_and_command_names_are_not_paths(self):
+        self.index("- **Contracts only:** enforced by the ESLint "
+                   "`no-restricted-imports` rule, the nightly `terraform plan` "
+                   "job and a `process.env` ban.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_directory_enforcer_resolves(self):
+        _write(os.path.join(self.root, "policy", "iam.rego"), "package p\n")
+        self.index("- **Write-once:** see `policy/`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_paths_outside_constraints_are_not_checked(self):
+        self.index("- **Pure:** no I/O. (unenforced)\n",
+                   working="- **Entry points:** `src/engine.ts`, `src/rules/`.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_fenced_sample_is_not_a_constraint(self):
+        self.index("- **Pure:** no I/O. (unenforced)\n\n"
+                   "```markdown\n- Enforced by `test/nowhere.test.ts`.\n```\n")
+        self.assertEqual(self.lint(), [])
+
+
+GLOSSARY = """# Glossary
+
+**Reading**:
+One sensor sample.
+_Avoid_: "measurement" (customers use it for a derived aggregate), "datapoint" (names
+the chart pixel), "event" (reserved for bus messages).
+
+**Event**:
+A message on the bus.
+_Avoid_: "signal" (names a reading-derived quantity).
+"""
+
+
+class VocabularyCase(unittest.TestCase):
+    """§7.2.4. The avoid-list is the checkable half of a glossary."""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+        _write(os.path.join(self.root, "AGENTS.md"), INDEX_AGENTS)
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+        self.glossary(GLOSSARY)
+
+    def glossary(self, text):
+        _write(os.path.join(self.root, "docs", "glossary.md"), text)
+
+    def doc(self, relpath, text):
+        _write(os.path.join(self.root, "docs", relpath), text)
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
+        return [f for f in ads_lint.Linter(self.root, args).run()
+                if f.rule == "§7.2.4"]
+
+    def test_avoided_synonym_is_reported_with_its_canonical_term(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nEach measurement is stored.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].level, ads_lint.WARN)
+        self.assertEqual(found[0].gate, "", "naming drift is prose, not structure")
+        self.assertIn("'measurement'", found[0].msg)
+        self.assertIn("'Reading'", found[0].msg)
+
+    def test_plural_is_reported(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nWe keep raw datapoints.\n")
+        self.assertEqual(len(self.lint()), 1)
+
+    def test_synonym_that_is_another_entrys_canonical_term_is_not_reported(self):
+        self.doc("concept/01-drivers.md", "# Drivers\n\nAn event is published.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_term_quoted_inside_a_rejection_reason_is_not_an_avoid_term(self):
+        # "bus messages" sits inside the parenthesised reason for rejecting
+        # "event"; reading it as a rejection would ban the word that explains
+        # the rejection.
+        self.glossary(GLOSSARY.replace("bus messages", '"bus messages"'))
+        self.doc("concept/01-drivers.md", "# Drivers\n\nBus messages carry events.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_code_spans_and_fences_are_not_prose(self):
+        self.doc("concept/01-drivers.md",
+                 "# Drivers\n\nThe field is `measurement_id`.\n\n"
+                 "```python\nmeasurement = 1\n```\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_glossary_itself_is_exempt(self):
+        self.assertEqual(self.lint(), [])
+
+    def test_immutable_classes_are_exempt(self):
+        self.doc("records/2026-08-14-outage.md",
+                 "# Outage\n\nThe customer called it a measurement.\n")
+        self.assertEqual(self.lint(), [])
+
+    def test_context_files_are_scanned(self):
+        _write(os.path.join(self.root, "AGENTS.md"),
+               INDEX_AGENTS + "\n## Purpose\nWe store every measurement.\n")
+        found = self.lint()
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(os.path.basename(found[0].path), "AGENTS.md")
+
+    def test_no_glossary_means_no_findings(self):
+        os.remove(os.path.join(self.root, "docs", "glossary.md"))
+        self.doc("concept/01-drivers.md", "# Drivers\n\nEach measurement is stored.\n")
+        self.assertEqual(self.lint(), [])
+
+
+class TestsRunDirectlyAndUnderDiscovery(unittest.TestCase):
+    """`unittest.main()` belongs at the end of the file: run in the middle, it
+    executes before the classes below it are defined, so running the file
+    directly silently exercises fewer tests than discovery does."""
+
+    def test_main_guard_is_last(self):
+        with open(os.path.join(_HERE, "test_ads_lint.py"), encoding="utf-8") as fh:
+            body = fh.read()
+        guards = [i for i, line in enumerate(body.splitlines())
+                  if line.startswith("if __name__")]
+        self.assertEqual(len(guards), 1, "exactly one top-level main guard")
+        self.assertTrue(body.rstrip().endswith("unittest.main()"))
 
 
 if __name__ == "__main__":

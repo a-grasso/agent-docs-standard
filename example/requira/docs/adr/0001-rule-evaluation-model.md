@@ -23,8 +23,8 @@ evaluator, in the engine loop.
 ## Consequences
 - **Positive:** identical results live and in back-test; trivially unit-testable; parallelizable.
 - **Negative / cost:** the engine loop must assemble windows before calling the evaluator.
-- **Follow-ups:** the `alert-throttling` feature adds stateful suppression — see its plan for
+- **Follow-ups:** the `alert-throttling` feature adds stateful suppression - see its plan for
   how it stays compatible with purity (state passed in, not read inside).
 
 ## Alternatives considered
-- **Evaluator reads DB/clock directly** — rejected: non-reproducible, untestable, live≠backtest.
+- **Evaluator reads DB/clock directly** - rejected: non-reproducible, untestable, live≠backtest.

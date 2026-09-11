@@ -5,6 +5,8 @@ status: accepted
 date: 2026-06-09
 supersedes: -
 superseded-by: -
+revisit-when: a module needs a synchronous call to another module that the API cannot serve
+  within its latency budget
 ---
 
 # ADR-0002: Module isolation via published contracts
@@ -31,5 +33,5 @@ Direct source imports across module boundaries are forbidden and enforced by an 
 - **Follow-ups:** every module's `AGENTS.md` `## Constraints` cites this ADR.
 
 ## Alternatives considered
-- **Shared internal library** — rejected: becomes a god-module and a coupling magnet.
-- **Allow imports, rely on discipline** — rejected: not enforceable, and invisible to agents.
+- **Shared internal library** - rejected: becomes a god-module and a coupling magnet.
+- **Allow imports, rely on discipline** - rejected: not enforceable, and invisible to agents.

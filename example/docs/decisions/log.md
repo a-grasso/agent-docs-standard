@@ -36,3 +36,17 @@ turns out to be architectural (standard §7.2.2).
 lets `requira` compare readings without conversion guesswork.
 
 **Scope:** All modules and the API contract.
+
+---
+
+## Clear-then-refire re-alerts immediately
+**Date:** 2026-08-30 · **Tags:** [requira, alerting]
+
+**Decision:** When a throttled condition clears and then fires again, `requira` raises a new
+alert at once instead of waiting out the remaining cooldown.
+
+**Why:** The cooldown exists to suppress a flapping sensor, not to hide a condition that
+genuinely resolved and returned. Operators treat a clear as the end of an episode, so the
+next occurrence is a new episode to them.
+
+**Scope:** `requira` throttling only. Dispatch retry behaviour in `functions` is unaffected.

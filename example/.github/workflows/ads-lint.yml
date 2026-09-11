@@ -1,4 +1,4 @@
-# Reference CI — lint this project against the Agent Docs Standard on every push/PR.
+# Reference CI - lint this project against the Agent Docs Standard on every push/PR.
 #
 # The linter is vendored at .ads/ads-lint.py (see .ads/README.md), so this workflow is
 # self-contained: no network fetch, and pinned to the version you vendored. The linter is
@@ -20,7 +20,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      # --strict also fails on warnings (stale ephemeral docs, missing aliases, size budget).
+      # --strict also fails on warnings (missing aliases, size budget, docs/ class rules,
+      # and the substrate check of SPEC §7.3.2).
       # Drop --strict to gate on errors only.
       - name: Lint docs against the Agent Docs Standard
         run: python3 .ads/ads-lint.py --root . --strict

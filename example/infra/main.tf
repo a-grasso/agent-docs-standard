@@ -1,4 +1,4 @@
-# CenterSight infrastructure — topology entry point.
+# CenterSight infrastructure - topology entry point.
 #
 # Governing docs (see ./AGENTS.md and the ADRs it cites):
 #   - root ADR-0003 : telemetry store is append-only -> lifecycle rule forbids destroy, adds

@@ -1,9 +1,8 @@
 // Rule evaluation engine loop.
 //
 // Governing docs (see ../AGENTS.md):
-//   - module ADR-0001: the evaluator is PURE — (rule, window[, state]) -> decision.
+//   - module ADR-0001: the evaluator is PURE - (rule, window[, state]) -> decision.
 //     All I/O (windows, state, dispatch) lives HERE in the loop, never in a rule.
-//   - in-flight feature: docs/plans/alert-throttling-plan.md (adds SuppressionState).
 
 import type { Reading, Rule, AlertSink, WindowStore, StateStore } from "./domain/types";
 import { evaluate } from "./rules";

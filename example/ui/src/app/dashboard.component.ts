@@ -1,7 +1,7 @@
 // Plant condition dashboard.
 //
 // Before extending this (see ../AGENTS.md `dep:`):
-//   - ng-ui   : reuse <cs-chart>, <cs-card>, <cs-page> — do not hand-roll charts/layout.
+//   - ng-ui   : reuse <cs-chart>, <cs-card>, <cs-page> - do not hand-roll charts/layout.
 //   - ng-env  : read API base URL & feature flags from EnvService, never from process.env.
 //   - centersight-api-doc.com : the /v1/telemetry and /v1/alerts contracts.
 

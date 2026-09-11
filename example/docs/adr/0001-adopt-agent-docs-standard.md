@@ -1,10 +1,10 @@
 ---
 id: ADR-0001
 title: Adopt the Agent Docs Standard in a monorepo
-status: accepted
+status: superseded
 date: 2026-06-02
 supersedes: -
-superseded-by: -
+superseded-by: ADR-0004
 ---
 
 # ADR-0001: Adopt the Agent Docs Standard in a monorepo
@@ -33,7 +33,7 @@ We will adopt the **Agent Docs Standard** and structure the repo as a **monorepo
   cross-module constraints the standard's `## Constraints` sections point at.
 
 ## Alternatives considered
-- **Keep the monolithic `CLAUDE.md`** — rejected: does not scale with the codebase or the
+- **Keep the monolithic `CLAUDE.md`** - rejected: does not scale with the codebase or the
   context window.
-- **Polyrepo** — rejected for now: the modules co-release; `dep:` still lets us split later
+- **Polyrepo** - rejected for now: the modules co-release; `dep:` still lets us split later
   without changing the doc model (standard §6.3.4).

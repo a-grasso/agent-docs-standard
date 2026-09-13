@@ -177,8 +177,8 @@ work without it, often enough to justify that recurring cost.
 4.6.1. **Truth precedes admissibility.** The tests in §4.6.2 weigh what a line costs against
 what it is worth. They assume the line is true; not one of them establishes it, and a
 fabricated line passes all four - an invented fact is not recoverable from the tree (A1), an
-agent that believes it acts on it (A2), it can be written to bear on most tasks (A3), and
-nothing will ever falsify an invented rationale (A4). Invention is therefore ruled out *before*
+agent that believes it will act on it (A2), it can be written to bear on most tasks (A3),
+and nothing will ever falsify an invented rationale (A4). Invention is ruled out *before*
 the tests are reached rather than by them: a line whose content is not known to be true
 **MUST NOT** be written into a context file, however well it would score.
 
@@ -719,8 +719,9 @@ A project **MAY** claim one of three cumulative levels.
   the size budget (§3.4).
 
 > **Levels certify structure, not content.** The body-section requirements (§4.5), enforcer
-> naming (§4.5.2), content admissibility (§4.6), time neutrality (§4.7), the substrate rule
-> (§7.3) and routing (§7.4) are **normative but not certified**. They are properties of prose
+> naming (§4.5.2), content admissibility (§4.6) and the truth it presupposes (§4.6.1, §7.1.5),
+> time neutrality (§4.7), the substrate rule (§7.3) and routing (§7.4) are **normative but not
+> certified**. They are properties of prose
 > rather than of the tree, and a level that claimed to verify them would claim more than
 > tooling can establish (§7.4.4).
 > A project **MAY** report them as separately reviewed; it **MUST NOT** present a conformance

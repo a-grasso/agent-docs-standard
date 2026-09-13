@@ -102,7 +102,7 @@ the file.
 
 4.2.1. There is deliberately **no** key for the date a context file was last changed. Version
 control already holds that answer exactly (`git log -1 --format=%cs <file>`), which makes a
-hand-maintained copy derivable content (§4.6.3, A1) and a self-report nothing can check. It
+hand-maintained copy derivable content (§4.6.4, A1) and a self-report nothing can check. It
 is also precisely the undatable claim §4.7.2 rejects, wearing a frontmatter key: a reader
 cannot tell "updated on that date and still true" from "updated on that date and abandoned
 the same day". Freshness is a property of the tree, not a declaration a file makes about
@@ -152,11 +152,11 @@ unexamined. A lint rule or CI job named in prose is not file-shaped and needs no
 used as an authoring prompt; every heading it offers for which the node has no admissible
 content **MUST** then be deleted (§4.5.1). What is forbidden is the uniform outcome, not the
 tool: identical section sets across every node are evidence of headings filled rather than of
-nodes described, and that is how derivable filler (§4.6.3) enters a project at scale.
+nodes described, and that is how derivable filler (§4.6.4) enters a project at scale.
 
 4.5.4. Off-repo context is carried by `dep` pointers (§5.3), **not** by a body section. Prose
 that lists or narrates dependencies duplicates machine-readable frontmatter and is
-inadmissible under §4.6.3. Where a pointer needs a one-line description of what lives at the
+inadmissible under §4.6.4. Where a pointer needs a one-line description of what lives at the
 other end, that description belongs in the pointer's `hint` (§5.3.2), not in the body.
 
 4.5.5. **Principles.** `## Principles` **MUST NOT** appear on a `module` node. A principle
@@ -167,14 +167,36 @@ a principle proper is project-wide, which is why the section is index-only in th
 stated, and the argument belongs in the durable document.
 
 > A constraint decides the cases a project enumerated. A principle decides the cases it did
-> not. This is why principles are admissible under §4.6.1 despite belonging to no particular
+> not. This is why principles are admissible under §4.6.2 despite belonging to no particular
 > task: they bear on all of them.
 
 4.6. **Content admissibility.** Context files are read on every task, so every line is paid for
 again on every session, indefinitely. A line is admissible only if an agent would produce worse
 work without it, often enough to justify that recurring cost.
 
-4.6.1. An admissible line **SHOULD** satisfy all four tests:
+4.6.1. **Truth precedes admissibility.** The tests in §4.6.2 weigh what a line costs against
+what it is worth. They assume the line is true; not one of them establishes it, and a
+fabricated line passes all four - an invented fact is not recoverable from the tree (A1), an
+agent that believes it will act on it (A2), it can be written to bear on most tasks (A3),
+and nothing will ever falsify an invented rationale (A4). Invention is ruled out *before*
+the tests are reached rather than by them: a line whose content is not known to be true
+**MUST NOT** be written into a context file, however well it would score.
+
+4.6.1.1. Where a fact is wanted and unknown, the answer is to leave it out, not to supply a
+plausible one. A section with nothing known to put under it is omitted (§4.5.1); an unknown
+that a durable document has a field for is written as *not recorded* (§7.1.5), which is a
+statement about the record rather than a placeholder (§4.6.4) - it says the answer was not
+captured, and it cannot be mistaken for one that was.
+
+4.6.1.2. Rationale: this is the one failure a context file cannot absorb. Inadmissible content
+(§4.6.4) costs budget, and an agent recovers from it by reading past it; a false line is acted
+on, and the work it misdirects is not recovered by reading more carefully. The clause is worth
+stating because these files are increasingly written *by* agents, and an agent asked to
+describe a node whose facts it has not established is precisely the author that produces a
+fluent, confident, false line. It binds a human author identically, and is stated here
+because §4.6.2 gives neither of them any ground to refuse on.
+
+4.6.2. An admissible line **SHOULD** satisfy all four tests:
 
 | # | Test | Question it answers |
 |---|------|---------------------|
@@ -188,13 +210,13 @@ licenses removal of content that is true and useful**: such content is not delet
 relocated to `docs/` (§7) and reached by pointer, so it is loaded when relevant instead of
 always. A4 decides whether a line will still be worth its cost later.
 
-4.6.2. **Admissible content.** The classes of admissible content are exactly the body
+4.6.3. **Admissible content.** The classes of admissible content are exactly the body
 sections of §4.5, and nothing further: a line that belongs under none of those headings does
 not belong in the file. Two of them are narrower than their heading suggests - a command is
 admissible only where it is not discoverable from the tree or where the discoverable form is
 wrong here, and a decision in force is one line and a link, never the rationale.
 
-4.6.3. **Inadmissible content.** The following **SHOULD NOT** appear:
+4.6.4. **Inadmissible content.** The following **SHOULD NOT** appear:
 
 | Content | Why |
 |---------|-----|
@@ -381,6 +403,16 @@ write records, rather than a record itself. Class naming, frontmatter and lifecy
 to records only. Scaffolding **SHOULD** sit inside the class it serves, so that an author
 writing a document of that class encounters its template.
 
+7.1.5. **An unknown is recorded as unknown.** A durable document is written from what was
+established, and a field whose answer was not established **MUST NOT** be filled with a
+plausible one: the honest entry is *not recorded*. This is §4.6.1 applied to the permanent
+record, and it bites harder here than in a context file. An ADR is immutable (§7.2.1), so an
+invented alternative or an invented force is permanent, and the next decision is argued
+against an option nobody ever considered; a record is dated evidence of an event, and an
+invented detail in it is evidence of something that did not happen. Neither is repairable by
+the mechanism its class provides, because neither is distinguishable afterwards from what the
+document got right.
+
 ### 7.2 Document classes
 
 7.2.1. **`adr/`** - Architecture Decision Records.
@@ -566,11 +598,28 @@ following rules **SHOULD** be applied in order; the first that matches wins.
 | # | If the content is | It belongs in |
 |---|-------------------|---------------|
 | R1 | status, sequencing, ownership, or what is next | the tracker (§7.3) |
-| R2 | an invariant, command, trap, or boundary an agent needs on most tasks in a node | that node's `AGENTS.md` (§3, §4.5) |
+| R2 | an invariant, command, trap, or boundary that an agent needs on **most tasks** in a node (A3, §4.6.2) | that node's `AGENTS.md` (§3, §4.5) |
 | R3 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` (§7.2.1) |
 | R4 | a decision that is thin, cheaply reversible, or was closed without commitment | `docs/decisions/` (§7.2.2) |
 | R5 | a completed event whose detail is worth keeping | `docs/records/` (§7.2.3) |
-| R6 | explanatory or reference detail needed for a recognisable minority of tasks | the appropriate durable class (§7.2.6), reached by pointer |
+| R6 | anything else a **recognisable minority** of tasks needs: explanatory or reference detail, and equally a rule that binds only those tasks (§7.4.1.1) | the appropriate durable class (§7.2.6), reached by pointer |
+
+7.4.1.1. **R2 and R6 divide on frequency, not on kind.** Being a rule does not route content
+to a context file: R2 carries A3 (§4.6.2) in its own wording, and A3 is the test that exists to
+keep true-but-occasional content out of the file every task pays for. A genuine invariant that
+binds a recognisable minority of tasks therefore falls to R6, and goes to the class that owns
+what it constrains - `domain/` for an invariant that holds independently of its implementation,
+a runbook for an operational rule, a reference for a schema - reached by pointer from the node's
+`AGENTS.md` and not restated there (§7.4.2). R6 says *anything else* for this reason: the table
+is applied in order and the first match wins, so a row that recognised only explanation would
+leave a rarely-firing rule matching nothing, and the nearest row that would take it is the one
+A3 refuses.
+
+7.4.1.2. **A relocated rule keeps its enforcer.** Routing a rule to a durable class under
+§7.4.1.1 does not relax §4.5.2: the entry **SHOULD** still name the test, lint rule, or CI job
+that enforces it, or still be marked `(unenforced)`. Whether a statement is an invariant or an
+aspiration is a property of the rule, not of the file it sits in, and a relocation that dropped
+the enforcer would make A3 a route for quietly turning the first into the second.
 
 7.4.2. Content **MUST NOT** be written to two destinations. Where a second destination needs
 it, that destination **MUST** link to the first rather than restate it. Two copies of a rule
@@ -670,8 +719,9 @@ A project **MAY** claim one of three cumulative levels.
   the size budget (§3.4).
 
 > **Levels certify structure, not content.** The body-section requirements (§4.5), enforcer
-> naming (§4.5.2), content admissibility (§4.6), time neutrality (§4.7), the substrate rule
-> (§7.3) and routing (§7.4) are **normative but not certified**. They are properties of prose
+> naming (§4.5.2), content admissibility (§4.6) and the truth it presupposes (§4.6.1, §7.1.5),
+> time neutrality (§4.7), the substrate rule (§7.3) and routing (§7.4) are **normative but not
+> certified**. They are properties of prose
 > rather than of the tree, and a level that claimed to verify them would claim more than
 > tooling can establish (§7.4.4).
 > A project **MAY** report them as separately reviewed; it **MUST NOT** present a conformance
@@ -750,7 +800,9 @@ is no longer conformant, and a job pinned to `--strict` starts failing on it. Th
 breaking change and is versioned as one.
 
 **New.** Body sections with per-section requirement levels and named enforcers (§4.5), a
-file-shaped one written as a resolvable link (§4.5.2.1); the A1-A4 admissibility test (§4.6);
+file-shaped one written as a resolvable link (§4.5.2.1); the A1-A4 admissibility test (§4.6),
+gated by the rule that a line must be true before it is worth anything (§4.6.1), with its
+counterpart for the permanent record (§7.1.5);
 time neutrality (§4.7); `records/`, a dated immutable class for events (§7.2.3);
 `glossary.md` (§7.2.4); `concept/` (§7.2.5); the substrate rule (§7.3); routing rules R1-R6
 (§7.4); the ADR field `revisit-when` (§7.2.1); the `tracker` key, which gives the second

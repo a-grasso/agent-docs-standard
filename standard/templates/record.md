@@ -26,5 +26,9 @@ A record is for an *event*, not a choice: an upgrade and its API drift, an incid
 cause, a completed migration, a benchmark run, a dated audit. An event has no alternatives;
 a decision does. Once written a record is never edited: a correction is a new record.
 
+Detail you did not establish is left out or written `not recorded` (§7.1.5). A record is
+dated evidence that something happened, so an invented detail in it is evidence of something
+that did not.
+
 It is also not a plan or a status report. Work in flight belongs to the tracker (§7.3).
 -->

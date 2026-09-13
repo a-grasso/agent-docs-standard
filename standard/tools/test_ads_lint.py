@@ -743,6 +743,86 @@ class VocabularyCase(unittest.TestCase):
         self.assertEqual(self.lint(), [])
 
 
+class DeclaredDocsFolder(unittest.TestCase):
+    """§7.1.1: the docs folder is at the path `docs:` gives, so a project that
+    declares one is checked there rather than at the literal spelling."""
+
+    INDEX = """---
+kind: project-index
+topology: monorepo
+docs: ./doc
+---
+
+# Fixture project
+"""
+
+    def setUp(self):
+        tmp = tempfile.TemporaryDirectory()
+        self.addCleanup(tmp.cleanup)
+        self.root = tmp.name
+        _write(os.path.join(self.root, "AGENTS.md"), self.INDEX)
+        _write(os.path.join(self.root, "CLAUDE.md"), "@AGENTS.md")
+
+    def lint(self):
+        args = argparse.Namespace(max_lines=200, min_lines=0, check_remote=False)
+        findings = ads_lint.Linter(self.root, args).run()
+        self.assertEqual([f for f in findings if f.level == ads_lint.ERROR], [],
+                         f"fixture root should be error-free: {msgs(findings)}")
+        return findings
+
+    def doc(self, relpath, body):
+        _write(os.path.join(self.root, "doc", *relpath.split("/")), body)
+
+    def test_adrs_under_a_declared_docs_folder_satisfy_saw_adr(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        self.assertEqual(missing_adr_info(self.lint()), [])
+
+    def test_a_misnamed_adr_under_a_declared_docs_folder_is_flagged(self):
+        self.doc("adr/use-postgres.md", ADR_RECORD)
+        found = for_file(self.lint(), "use-postgres.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.1")
+
+    def test_a_misnamed_record_under_a_declared_docs_folder_is_flagged(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        self.doc("records/an-outage.md", "# An outage\n")
+        found = for_file(self.lint(), "an-outage.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+    def test_time_neutrality_reaches_a_declared_docs_folder(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        self.doc("guides/deploy.md", "# Deploy\n\nWe previously used Ansible.\n")
+        found = for_file(self.lint(), "deploy.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.1.3")
+
+    def test_a_module_declares_its_own_docs_folder(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        _write(os.path.join(self.root, "svc", "AGENTS.md"),
+               "---\nkind: module\nup: ../AGENTS.md\ndocs: ./notes\n---\n\n# Svc\n")
+        _write(os.path.join(self.root, "svc", "CLAUDE.md"), "@AGENTS.md")
+        _write(os.path.join(self.root, "svc", "notes", "records", "an-outage.md"),
+               "# An outage\n")
+        found = for_file(self.lint(), "an-outage.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+    def test_a_literal_docs_folder_no_node_declares_is_still_checked(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        _write(os.path.join(self.root, "legacy", "docs", "records", "an-outage.md"),
+               "# An outage\n")
+        found = for_file(self.lint(), "an-outage.md")
+        self.assertEqual(len(found), 1, msgs(found))
+        self.assertEqual(found[0].rule, "§7.2.3")
+
+    def test_code_outside_every_docs_folder_is_untouched(self):
+        self.doc("adr/0001-use-postgres.md", ADR_RECORD)
+        _write(os.path.join(self.root, "src", "notes.md"),
+               "# Notes\n\nWe previously used Ansible.\n")
+        self.assertEqual(for_file(self.lint(), "notes.md"), [])
+
+
 class TestsRunDirectlyAndUnderDiscovery(unittest.TestCase):
     """`unittest.main()` belongs at the end of the file: run in the middle, it
     executes before the classes below it are defined, so running the file

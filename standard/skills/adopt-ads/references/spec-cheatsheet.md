@@ -22,6 +22,9 @@ repo. This cheatsheet is enough to scaffold correctly; consult the full `SPEC.md
 
 - Delete headings you cannot fill; never pad them. Identical section sets across nodes mean
   the template was filled rather than the node described (§4.5.3).
+- **Truth first (§4.6.1):** A1-A4 assume the line is true and none of them tests it - an
+  invented fact passes all four. Never fill an unknown with something plausible; omit it, or
+  write *not recorded* in a durable document's field (§7.1.5).
 - **Admissibility (A1-A4):** non-derivable, load-bearing, frequently relevant, stable. A3 is
   the one that licenses *removal*: true-but-occasional content moves to `docs/` behind a
   pointer, it is not deleted.
@@ -113,11 +116,14 @@ Applied when content is written; first match wins.
 | # | If the content is | It belongs in |
 |---|---|---|
 | R1 | status, sequencing, ownership, or what is next | the tracker |
-| R2 | an invariant, command, trap or boundary needed on most tasks in a node | that node's `AGENTS.md` |
+| R2 | an invariant, command, trap or boundary needed on **most** tasks in a node (A3) | that node's `AGENTS.md` |
 | R3 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` |
 | R4 | a decision that is thin, cheaply reversible, or closed without commitment | `docs/decisions/` |
 | R5 | a completed event whose detail is worth keeping | `docs/records/` |
-| R6 | explanatory or reference detail needed for a recognisable minority of tasks | the right durable class, reached by pointer |
+| R6 | anything a recognisable **minority** of tasks needs - detail, and equally a rule that binds only those tasks | the right durable class, reached by pointer |
+
+R2 and R6 split on **frequency, not kind** (§7.4.1.1): a real invariant that only fires for a
+minority of tasks is R6, not R2, and it keeps its enforcer where it lands (§7.4.1.2).
 
 Content **MUST NOT** be written twice; the second destination links instead (§7.4.2). Routing
 itself is not mechanically checkable (§7.4.4) - tooling checks the taxonomy, not the routing.

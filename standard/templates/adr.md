@@ -34,6 +34,12 @@ same as no field. Leave it out entirely if the decision really is permanent: its
 a claim, and that is the point. A provisional decision and a settled one look identical the
 moment they are written, and an accepted ADR is immutable, so nothing else tells them apart.
 
+Write only what was actually established. An ADR reconstructed after the fact will have
+fields you cannot fill - the forces that applied, the options that were weighed - and the
+entry for those is `not recorded` (§7.1.5), never a plausible substitute. This ADR is
+immutable, so an invented alternative is permanent, and the next decision gets argued
+against an option nobody ever considered.
+
 Do not point at the document that states this decision as current fact. That document cites
 this ADR, never the reverse (§7.4.2.1): the citation belongs in the file that changes, so it
 is repaired by the commit that invalidates it.

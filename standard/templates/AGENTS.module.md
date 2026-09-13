@@ -11,8 +11,9 @@ docs: ./docs
 
 <!--
 An authoring prompt, not a form (SPEC §4.5.3). Delete every heading with nothing admissible
-under it (§4.5.1). `## Principles` is absent by design: it is index-only (§4.5.5), and a
-principle that holds for one module is a constraint.
+under it (§4.5.1), and leave out anything you do not know to be true rather than filling it
+with something plausible (§4.6.1). `## Principles` is absent by design: it is index-only
+(§4.5.5), and a principle that holds for one module is a constraint.
 -->
 
 # <Module Name>

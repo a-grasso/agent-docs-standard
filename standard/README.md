@@ -86,7 +86,7 @@ flowchart TD
     R3 -- "thin, cheaply reversible,<br/>or closed without commitment" --> DEC["docs/decisions/<br/>a dated, append-only log"]
     R3 -- no --> R5{"R5<br/>a completed event?<br/>an event has no alternatives;<br/>a decision does"}
     R5 -- yes --> REC["docs/records/<br/>YYYY-MM-DD-slug.md<br/>incidents, upgrades, migrations,<br/>benchmarks, dated audits"]
-    R5 -- no --> R6["R6 · the fitting durable class<br/>concept/ · glossary.md · references/<br/>guides/ · runbooks/ · domain/<br/>reached by pointer, loaded when relevant"]
+    R5 -- no --> R6["R6 · the fitting durable class<br/>concept/ · glossary.md · references/<br/>guides/ · runbooks/ · domain/<br/>detail, and rules that bind a minority of tasks<br/>reached by pointer, loaded when relevant"]
 
     classDef q fill:#fffbe6,stroke:#c8a415,color:#5c4a00
     classDef tracker fill:#fdeef4,stroke:#c0397c,color:#6b1140
@@ -101,12 +101,19 @@ flowchart TD
     class K q
 ```
 
-Two properties of that picture carry most of the weight.
+Three properties of that picture carry most of the weight.
 
 **The substrate boundary is crossed once.** Only R1 leaves the repository, and the tracker is
 named a single time, by the project index's `tracker:` key. No individual document links a
 tracker item: a durable document outlives the work that produced it, so such a link resolves
 long after it stopped being the reason.
+
+**The split at each question is frequency, not kind.** R2 and R6 are not "rules" versus
+"detail" - both can be either. What decides is how often a task needs the thing: content the
+work needs on most tasks is worth loading on all of them, and content a recognisable minority
+needs is worth a pointer. A real invariant that fires rarely goes to the class that owns what
+it constrains and is reached from `AGENTS.md`, not restated in it - and it keeps naming its
+enforcer when it gets there, because that is a property of the rule and not of the file.
 
 **Time semantics follow mutability, not class-by-class taste.** Every destination in `docs/`
 is one of two kinds, and its class decides which:
@@ -188,7 +195,11 @@ badly.
   constraint is really a constraint, whether a trap is really a trap, whether the routing
   rules were followed - that is judgement, and a conformance level that claimed it would be
   claiming more than it can establish. Levels are a floor you can automate, not a review you
-  can skip.
+  can skip. §4.6.1 does *forbid* inventing a line nobody established, and that is a rule the
+  standard states and cannot check: nothing in a tree distinguishes a true rationale from a
+  fluent one. It is stated anyway because the four admissibility tests either side of it score
+  a fabricated line highly, and a standard that only ranked content by cost would read as
+  blessing it.
 - **It does not check the *content* of anything it points at.** A `dep` pointer resolves or
   it does not. Whether the thing at the other end still says what it said when you pointed at
   it is a different question, and a harder one: it needs content fingerprints, a notion of

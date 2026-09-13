@@ -21,7 +21,9 @@ nothing admissible to say under: an empty or padded section is worse than an abs
 the signal that headings were filled rather than nodes described.
 
 Admissible: what an agent cannot derive from the tree, needs on most tasks here, and that
-will still be true in a few changes' time (§4.6). Not admissible: directory listings,
+will still be true in a few changes' time (§4.6) - and that you know to be true. Never fill
+an unknown with something plausible: the four tests score an invention highly and nothing
+downstream catches it (§4.6.1). Leave it out. Not admissible: directory listings,
 restatements of the pointers above, framework descriptions, generic advice, status of work
 in flight (that belongs to the tracker, §7.3), and anything time-connotated (§4.7).
 -->

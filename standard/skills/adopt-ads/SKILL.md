@@ -20,9 +20,13 @@ what you can, then confirm concisely; only ask the user what you genuinely canno
 - **Additive only.** You create/modify docs (`AGENTS.md`, `CLAUDE.md`, `docs/`). Do **not**
   edit source code or move files around.
 - **Never fabricate.** If you don't know a value (a dep URL, a build command, a constraint),
-  **omit it** and list it in the handoff. A wrong pointer is worse than a missing one, and a
-  `TODO` left in a context file is inadmissible content that every future session pays for
-  (SPEC §4.6.3). The handoff is where unknowns go; the file is not.
+  **omit it** and list it in the handoff. This is SPEC §4.6.1, and it is the rule you are most
+  likely to break: the four admissibility tests score an invented line highly, so nothing
+  downstream of you will catch it. A wrong pointer is worse than a missing one, and a `TODO`
+  left in a context file is inadmissible content that every future session pays for
+  (SPEC §4.6.4). The handoff is where unknowns go; the file is not. In a durable document
+  with a field you cannot fill, write *not recorded* (SPEC §7.1.5) rather than something
+  plausible.
 - **Idempotent.** Safe to re-run. If a node already has `AGENTS.md`, treat this as
   upgrade/repair - lint first, fill gaps, don't clobber.
 - **Confirm before bulk writes.** Show the plan (which files you'll create) before creating

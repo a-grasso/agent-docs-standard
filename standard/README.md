@@ -188,7 +188,11 @@ badly.
   constraint is really a constraint, whether a trap is really a trap, whether the routing
   rules were followed - that is judgement, and a conformance level that claimed it would be
   claiming more than it can establish. Levels are a floor you can automate, not a review you
-  can skip.
+  can skip. §4.6.1 does *forbid* inventing a line nobody established, and that is a rule the
+  standard states and cannot check: nothing in a tree distinguishes a true rationale from a
+  fluent one. It is stated anyway because the four admissibility tests either side of it score
+  a fabricated line highly, and a standard that only ranked content by cost would read as
+  blessing it.
 - **It does not check the *content* of anything it points at.** A `dep` pointer resolves or
   it does not. Whether the thing at the other end still says what it said when you pointed at
   it is a different question, and a harder one: it needs content fingerprints, a notion of

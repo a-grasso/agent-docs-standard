@@ -426,10 +426,15 @@ class Linter:
         index = next((n for n in nodes.values()
                       if n.fm.get("kind") == "project-index"), None)
         index_docs = self._docs_dir(index) if index else None
+        # §7.1.1: a docs folder sits where its node's `docs:` key says it does,
+        # on every node and not just the index. Resolving each one is what stops
+        # the walk below from checking only folders that happen to be spelled
+        # "docs".
+        docs_dirs = {self._docs_dir(n) for n in nodes.values()}
         self._load_vocabulary(index_docs)
         self.check_nodes(nodes)
         self.check_graph(nodes)
-        self.check_docs(index_docs)
+        self.check_docs(index_docs, docs_dirs)
         return self.findings
 
     # -- per-node frontmatter & aliases -----------------------------------
@@ -658,14 +663,14 @@ class Linter:
             self.add(WARN, "§5.3.3", n.path, f"dep {dep_id} unreachable: {url}")
 
     # -- docs taxonomy ----------------------------------------------------
-    def check_docs(self, index_docs=None):
+    def check_docs(self, index_docs=None, docs_dirs=()):
         saw_adr = False
         for dirpath, dirnames, filenames in os.walk(self.root):
             dirnames[:] = [
                 d for d in dirnames if d not in SKIP_DIRS and not d.startswith(".")
             ]
             parent = os.path.basename(dirpath)
-            in_docs = "docs" in os.path.relpath(dirpath, self.root).split(os.sep)
+            in_docs = self._in_docs(dirpath, docs_dirs)
             for f in filenames:
                 if not f.endswith(".md"):
                     continue
@@ -734,6 +739,22 @@ class Linter:
     def _docs_dir(node):
         return os.path.realpath(
             os.path.join(node.directory, str(node.fm.get("docs") or "./docs")))
+
+    def _in_docs(self, dirpath, docs_dirs):
+        """§7.1: is this directory inside a docs folder, and so governed by the
+        class rules? Two ways to qualify, and a directory needs either.
+
+        A node declaring `docs: ./doc` (§4.2) puts its docs tree somewhere the
+        name does not give away, so the declared paths are resolved and matched
+        against. The literal spelling is kept alongside them because a `docs/`
+        folder under a directory that owns no context file is still a docs
+        folder; dropping it would trade one silent gap for another.
+        """
+        real = os.path.realpath(dirpath)
+        for d in docs_dirs:
+            if real == d or real.startswith(d + os.sep):
+                return True
+        return "docs" in os.path.relpath(dirpath, self.root).split(os.sep)
 
     def _check_glossary_placement(self, full, dirpath, index_docs):
         """§7.2.4. Exactly one glossary, beside the project index, so that one

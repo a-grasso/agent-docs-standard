@@ -33,7 +33,7 @@ python3 standard/tools/ads-lint.py --root <project> --json | jq   # machine-read
 | Frontmatter | valid YAML block; `kind ∈ {project-index, module}`; exactly one reachable `project-index`; `project-index` has `topology` and no `up`; `module` has `up` (§3, §4, §6.3). |
 | Pointer graph | `up`/`ref`/local-`dep` targets resolve **case-sensitively**, on every host filesystem; `up` is acyclic and terminates at the index; every module is enumerated in its parent's `ref`; `dep` entries well-formed (§5). Only *declared* `dep`s: nothing here reads source, so an undeclared dependency is invisible (§5.3.5). |
 | Aliases | a `CLAUDE.md` symlink to `AGENTS.md` exists beside each node (§3.2). |
-| Docs taxonomy | ADR filenames `NNNN-slug.md` with a valid `status`; record filenames `YYYY-MM-DD-slug.md`; one glossary, at the index; `README.md` and `_`-prefixed files exempt everywhere in `docs/` (§7.1.4). |
+| Docs taxonomy | ADR filenames `NNNN-slug.md` with a valid `status`; record filenames `YYYY-MM-DD-slug.md`; one glossary, at the index; `README.md` and `_`-prefixed files exempt everywhere in `docs/` (§7.1.4). The docs tree is located per node from its `docs:` key (§7.1.1), so a project that keeps its docs somewhere other than `docs/` is checked where it says they are; a folder literally named `docs` is checked whether or not a node claims it. |
 | Substrates | a durable doc that declares `status:` is stating work state, which belongs to the tracker (§7.3.2). `adr/` is exempt: its status is the decision's own lifecycle. Reported **ungated**: §9 places the substrate rule outside the conformance levels, so this finding never changes the reported level. Use `--strict` to gate CI on it. |
 | Time neutrality | context-file bodies (§4.7.1) and mutable `docs/` classes (§7.1.3) are checked for narration of change. The term list deliberately excludes `now`/`since`/`still`/`new`/`old`: a check that fires on those trains its readers to ignore it. |
 | Enforcers | a path named under `## Constraints` must resolve, so a constraint cannot name a test that is not there (§4.5.2.1). Only tokens with a directory component and an extension count as paths, so `no-restricted-imports` and `terraform plan` are left alone. Reported **ungated**: §9 keeps §4.5 out of the levels. |
@@ -76,9 +76,9 @@ ads-lint:
 ### Tests
 
 Stdlib `unittest`, no dependencies. Covers the `docs/` class rules (§7.1.4, §7.2.1, §7.2.3,
-§7.2.4), the substrate check (§7.3.2), enforcer resolution (§4.5.2.1), the glossary avoid-list
-(§7.2.4), time neutrality (§4.7.1), the size floor (§3.4.1) and case-sensitive pointer
-resolution (§5):
+§7.2.4), docs-folder resolution from `docs:` (§7.1.1), the substrate check (§7.3.2), enforcer
+resolution (§4.5.2.1), the glossary avoid-list (§7.2.4), time neutrality (§4.7.1), the size
+floor (§3.4.1) and case-sensitive pointer resolution (§5):
 
 ```bash
 python3 standard/tools/test_ads_lint.py

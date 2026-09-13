@@ -598,11 +598,28 @@ following rules **SHOULD** be applied in order; the first that matches wins.
 | # | If the content is | It belongs in |
 |---|-------------------|---------------|
 | R1 | status, sequencing, ownership, or what is next | the tracker (§7.3) |
-| R2 | an invariant, command, trap, or boundary an agent needs on most tasks in a node | that node's `AGENTS.md` (§3, §4.5) |
+| R2 | an invariant, command, trap, or boundary that an agent needs on **most tasks** in a node (A3, §4.6.2) | that node's `AGENTS.md` (§3, §4.5) |
 | R3 | a decision whose rationale would otherwise be re-litigated or silently reversed | `docs/adr/` (§7.2.1) |
 | R4 | a decision that is thin, cheaply reversible, or was closed without commitment | `docs/decisions/` (§7.2.2) |
 | R5 | a completed event whose detail is worth keeping | `docs/records/` (§7.2.3) |
-| R6 | explanatory or reference detail needed for a recognisable minority of tasks | the appropriate durable class (§7.2.6), reached by pointer |
+| R6 | anything else a **recognisable minority** of tasks needs: explanatory or reference detail, and equally a rule that binds only those tasks (§7.4.1.1) | the appropriate durable class (§7.2.6), reached by pointer |
+
+7.4.1.1. **R2 and R6 divide on frequency, not on kind.** Being a rule does not route content
+to a context file: R2 carries A3 (§4.6.2) in its own wording, and A3 is the test that exists to
+keep true-but-occasional content out of the file every task pays for. A genuine invariant that
+binds a recognisable minority of tasks therefore falls to R6, and goes to the class that owns
+what it constrains - `domain/` for an invariant that holds independently of its implementation,
+a runbook for an operational rule, a reference for a schema - reached by pointer from the node's
+`AGENTS.md` and not restated there (§7.4.2). R6 says *anything else* for this reason: the table
+is applied in order and the first match wins, so a row that recognised only explanation would
+leave a rarely-firing rule matching nothing, and the nearest row that would take it is the one
+A3 refuses.
+
+7.4.1.2. **A relocated rule keeps its enforcer.** Routing a rule to a durable class under
+§7.4.1.1 does not relax §4.5.2: the entry **SHOULD** still name the test, lint rule, or CI job
+that enforces it, or still be marked `(unenforced)`. Whether a statement is an invariant or an
+aspiration is a property of the rule, not of the file it sits in, and a relocation that dropped
+the enforcer would make A3 a route for quietly turning the first into the second.
 
 7.4.2. Content **MUST NOT** be written to two destinations. Where a second destination needs
 it, that destination **MUST** link to the first rather than restate it. Two copies of a rule

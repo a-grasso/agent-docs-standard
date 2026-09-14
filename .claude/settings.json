@@ -1,5 +1,5 @@
 {
   "env": {
-    "OTEL_RESOURCE_ATTRIBUTES": "project=doc-standard"
+    "OTEL_RESOURCE_ATTRIBUTES": "project=agent-docs-standard"
   }
 }

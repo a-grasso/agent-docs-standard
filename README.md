@@ -49,38 +49,7 @@ work state out of the permanent record entirely.
 
 ## The model at a glance
 
-```mermaid
-graph LR
-    subgraph up_deps["upstream (other repos / external)"]
-        NGENV["ng-env<br/>AGENTS.md"]
-        NGUI["ng-ui<br/>AGENTS.md"]
-        API["centersight-api-doc.com"]
-    end
-
-    IDX["<b>project index</b><br/>AGENTS.md + CLAUDE.md<br/>(root: .git or workdir)"]
-
-    FN["functions<br/>AGENTS.md"]
-    UI["ui<br/>AGENTS.md"]
-    RQ["requira<br/>AGENTS.md"]
-    INF["infra<br/>AGENTS.md"]
-
-    IDX -- "ref:" --> FN
-    IDX -- "ref:" --> UI
-    IDX -- "ref:" --> RQ
-    IDX -- "ref:" --> INF
-
-    FN -- "up:" --> IDX
-    UI -- "up:" --> IDX
-    RQ -- "up:" --> IDX
-    INF -- "up:" --> IDX
-
-    IDX -- "dep:" --> NGENV
-    IDX -- "dep:" --> NGUI
-    IDX -- "dep:" --> API
-
-    FN -.-> FND["docs/<br/>adr · decisions · records<br/>glossary · concept"]
-    RQ -.-> RQD["docs/<br/>durable classes only"]
-```
+![A project tree: the root AGENTS.md is the project index; each module (api, web, worker, infra) has its own AGENTS.md linked to the index by ref and up, and its own docs/ folder. The index points off-repo with dep (other repos, external docs) and to the issue tracker with tracker.](./assets/ads-model.svg)
 
 Every class in a node's `docs/` is durable, and each is either **immutable and dated**
 (`adr/`, `decisions/`, `records/`) or **mutable and time-neutral** (everything else). Work in

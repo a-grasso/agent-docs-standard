@@ -1,0 +1,115 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADS: define the state, not the path</title>
+<style>
+  @page { size: 1920px 1080px; margin: 0; }
+  :root {
+    --ink: #343a40; --muted: #6c757d; --line: #e9ecef;
+    --imm: #6741d9; --imm-bg: #f3f0ff;
+    --docs: #c92a2a; --tracker: #c2255c;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; background: #fff; }
+  body { font-family: var(--sans); color: var(--ink); padding: 56px 72px 48px; display: flex; flex-direction: column; }
+  code { font-family: var(--mono); font-size: .92em; }
+
+  header { display: flex; flex-direction: column; }
+  .eyebrow { font-size: 24px; color: var(--muted); letter-spacing: .02em; }
+  .eyebrow b { color: var(--ink); }
+  h1 { font-size: 80px; line-height: 1; letter-spacing: -.02em; margin-top: 12px; }
+  h1 em { font-style: normal; color: var(--imm); }
+  .what { font-size: 28px; line-height: 1.3; color: var(--muted); margin-top: 14px; }
+  .what b { color: var(--ink); font-weight: 600; }
+
+  main { flex: 1; display: grid; grid-template-columns: 900px 1fr; gap: 52px; margin-top: 30px; min-height: 0; }
+  .diagram { border: 1px solid var(--line); border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+  .diagram svg { display: block; }
+
+  .right { display: flex; flex-direction: column; justify-content: space-between; min-width: 0; }
+  h2 { font-size: 18px; text-transform: uppercase; letter-spacing: .1em; color: var(--muted); margin-bottom: 10px; }
+  .why p { font-size: 24px; line-height: 1.35; }
+
+  table { width: 100%; border-collapse: collapse; font-size: 22px; line-height: 1.3; }
+  th { text-align: left; font-size: 22px; padding: 0 16px 10px; vertical-align: bottom; }
+  th small { display: block; font-weight: 400; font-size: 18px; color: var(--muted); margin-top: 4px; }
+  td { padding: 10px 16px; border-top: 1px solid var(--line); vertical-align: top; }
+  td:first-child, th:first-child { color: var(--muted); width: 46%; }
+  th:last-child, td:last-child { background: var(--imm-bg); }
+  th:last-child { color: var(--imm); border-radius: 10px 10px 0 0; padding-top: 14px; }
+  tr:last-child td:last-child { border-radius: 0 0 10px 10px; }
+
+  .states { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 0; }
+  .state { position: relative; padding: 12px 16px; border: 1px solid #ced4da; border-radius: 10px; font-size: 20px; line-height: 1.3; background: #fff; }
+  .state + .state { margin-left: 34px; }
+  .state + .state::before { content: "→"; position: absolute; left: -30px; top: 50%; transform: translateY(-50%); font-size: 26px; color: var(--muted); }
+  .state b { display: block; font-size: 16px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 4px; }
+  .state.start b { color: var(--ink); }
+  .state.flight { border-style: dashed; border-color: var(--tracker); }
+  .state.flight b { color: var(--tracker); }
+  .state.landed { border-color: var(--imm); }
+  .state.landed b { color: var(--imm); }
+  .path { font-size: 20px; color: var(--muted); margin-top: 10px; }
+
+  footer { display: flex; justify-content: space-between; align-items: baseline; margin-top: 28px; padding-top: 20px; border-top: 2px solid var(--line); }
+  .takeaway { font-size: 32px; font-weight: 600; letter-spacing: -.01em; }
+  .takeaway span { color: var(--muted); font-weight: 400; }
+  .url { font-family: var(--mono); font-size: 19px; color: var(--muted); }
+</style>
+</head>
+<body>
+  <header>
+    <div>
+      <div class="eyebrow"><b>ADS</b> · Agent Docs Standard · a profile of <code>AGENTS.md</code></div>
+      <h1>Define the <em>state</em>, not the path.</h1>
+    </div>
+    <p class="what">A standard for <b>where project knowledge lives</b> and what shape it has, so an agent finds what it needs, when it needs it.</p>
+  </header>
+
+  <main>
+    <div class="diagram">
+      <svg viewBox="28 18 860 646" width="880" role="img" aria-label="A project tree: the root AGENTS.md is the project index; each module has its own AGENTS.md and docs/ folder linked by ref and up; dep points off-repo; tracker points to the issue tracker.">
+        <image href="../assets/ads-model.svg" width="900" height="690"/>
+      </svg>
+    </div>
+
+    <div class="right">
+      <section class="why">
+        <h2>Why</h2>
+        <p>Agents start every task cold. They <b>starve</b> (can't find the decision), <b>flood</b> (one giant <code>CLAUDE.md</code>), or trust docs that <b>rotted silently</b>.</p>
+      </section>
+
+      <section>
+        <h2>The idea</h2>
+        <table>
+          <tr>
+            <th>Workflow frameworks<small>GSD, Pocock's skills, Spec Kit, BMAD…</small></th>
+            <th>ADS<small>a standard for the result</small></th>
+          </tr>
+          <tr><td>prescribe the <b>steps</b><br><code>/plan → /execute → /verify</code></td><td>prescribes the <b>artifacts</b><br>what exists, where, in which shape</td></tr>
+          <tr><td>tied to one tool and today's models</td><td>any agent, any workflow, any model</td></tr>
+          <tr><td>right if you followed the process</td><td>checkable after the fact: <code>ads-lint</code> in CI</td></tr>
+        </table>
+      </section>
+
+      <section>
+        <h2>States, not steps</h2>
+        <div class="states">
+          <div class="state start"><b>Start</b>one <code>AGENTS.md</code> at the root</div>
+          <div class="state flight"><b>In flight</b>status in the tracker, never in the repo</div>
+          <div class="state landed"><b>Landed</b>decision → <code>adr/</code><br>event → <code>records/</code><br>rule → <code>AGENTS.md</code></div>
+        </div>
+        <p class="path">How you get from one to the next is your call.</p>
+      </section>
+    </div>
+  </main>
+
+  <footer>
+    <p class="takeaway">Use ADS or don't. <span>Keep the idea:</span> specify the artifacts, let the path vary.</p>
+    <p class="url">github.com/a-grasso/agent-docs-standard</p>
+  </footer>
+</body>
+</html>

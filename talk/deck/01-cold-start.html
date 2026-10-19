@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADS 1: agents start cold</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+  .panels { display: grid; grid-template-columns: repeat(3, 1fr); gap: 40px; }
+  .panel { border: 1px solid var(--line); border-top: 6px solid var(--warn); border-radius: 14px; padding: 36px 36px 40px; }
+  .panel h2 { font-size: 46px; letter-spacing: -.01em; color: var(--warn); }
+  .panel .q { font-size: 30px; line-height: 1.35; margin-top: 18px; }
+  .panel .cause { font-size: 24px; line-height: 1.4; color: var(--muted); margin-top: 22px; padding-top: 18px; border-top: 1px solid var(--line); }
+  .panel code { background: #f8f9fa; padding: 0 6px; border-radius: 4px; }
+  .frag { font-size: 30px; margin-top: 56px; color: var(--muted); }
+  .frag b { color: var(--ink); }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow"><b>Why current approaches fail</b></div>
+    <h1>Every task starts <em>cold</em>.</h1>
+    <p class="lede">An agent remembers nothing from yesterday. It knows only what it can find in the repo, right now.</p>
+  </header>
+
+  <main>
+    <div class="panels">
+      <section class="panel">
+        <h2>Starve</h2>
+        <p class="q">“Why is retry disabled here?” The answer is in a Slack thread from March.</p>
+        <p class="cause">The decision was made, never written where the code lives.</p>
+      </section>
+      <section class="panel">
+        <h2>Flood</h2>
+        <p class="q">A 2,000-line <code>CLAUDE.md</code>, loaded on every task, mostly about other modules.</p>
+        <p class="cause">Everything in one file, so nothing is findable.</p>
+      </section>
+      <section class="panel">
+        <h2>Rot</h2>
+        <p class="q">The doc says <code>v2</code> of the API. Production runs <code>v4</code>. The agent believes the doc.</p>
+        <p class="cause">Nobody notices a stale doc until an agent acts on it.</p>
+      </section>
+    </div>
+    <p class="frag">Same root cause: <b>knowledge is fragmented</b> across chats, wikis, tickets and heads, with no agreed place or shape.</p>
+  </main>
+
+  <footer><span>ADS · Agent Docs Standard</span><span>1 / 5</span></footer>
+</body>
+</html>

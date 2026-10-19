@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADS 2: define the state, not the path</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+  main { flex-direction: row; align-items: stretch; gap: 64px; margin: 36px 0 32px; }
+  .diagram { width: 960px; border: 1px solid var(--line); border-radius: 14px; display: flex; align-items: center; justify-content: center; overflow: hidden; padding: 20px; }
+  .diagram img { max-width: 100%; max-height: 100%; display: block; }
+  .states { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+  .state { padding: 20px 26px; border: 1px solid #ced4da; border-radius: 12px; font-size: 28px; line-height: 1.35; }
+  .state b { display: block; font-size: 18px; text-transform: uppercase; letter-spacing: .1em; margin-bottom: 6px; }
+  .state.flight { border-style: dashed; border-color: var(--tracker); }
+  .state.flight b { color: var(--tracker); }
+  .state.landed { border-color: var(--imm); background: var(--imm-bg); }
+  .state.landed b { color: var(--imm); }
+  .arrow { text-align: center; font-size: 30px; color: var(--muted); line-height: 0; }
+  .path { font-size: 26px; color: var(--muted); margin-top: 8px; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow"><b>Enter ADS</b> · Agent Docs Standard · a profile of <code>AGENTS.md</code></div>
+    <h1>Define the <em>state</em>, not the path.</h1>
+    <p class="lede">A standard for <b>where project knowledge lives</b> and what shape it has, so an agent finds what it needs, when it needs it.</p>
+  </header>
+
+  <main>
+    <div class="diagram">
+      <img src="../../assets/ads-model.svg" alt="A project tree: the root AGENTS.md is the project index; each module has its own AGENTS.md and docs/ folder linked by ref and up; dep points off-repo; tracker points to the issue tracker.">
+    </div>
+    <div class="states">
+      <div class="state"><b>Start</b>one <code>AGENTS.md</code> at the root</div>
+      <div class="arrow">↓</div>
+      <div class="state flight"><b>In flight</b>status lives in the tracker, never in the repo</div>
+      <div class="arrow">↓</div>
+      <div class="state landed"><b>Landed</b>decision → <code>adr/</code><br>event → <code>records/</code><br>rule → <code>AGENTS.md</code></div>
+      <p class="path">How you get from one to the next is your call.</p>
+    </div>
+  </main>
+
+  <footer><span>ADS · Agent Docs Standard</span><span>2 / 5</span></footer>
+</body>
+</html>

@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>ADS 3: compared with workflow frameworks</title>
+<link rel="stylesheet" href="deck.css">
+<style>
+  table { width: 100%; border-collapse: collapse; font-size: 34px; line-height: 1.35; }
+  th { text-align: left; font-size: 38px; padding: 0 32px 18px; vertical-align: bottom; }
+  th small { display: block; font-weight: 400; font-size: 24px; color: var(--muted); margin-top: 6px; }
+  td { padding: 26px 32px; border-top: 1px solid var(--line); vertical-align: top; }
+  td:first-child, th:first-child { color: var(--muted); width: 50%; }
+  th:last-child, td:last-child { background: var(--imm-bg); }
+  th:last-child { color: var(--imm); border-radius: 14px 14px 0 0; padding-top: 24px; }
+  tr:last-child td:last-child { border-radius: 0 0 14px 14px; }
+  td code { font-size: .85em; }
+</style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow"><b>Comparison with workflow frameworks</b></div>
+    <h1>Steps vs. <em>artifacts</em>.</h1>
+  </header>
+
+  <main>
+    <table>
+      <tr>
+        <th>Workflow frameworks<small>GSD, Pocock's skills, Spec Kit, BMAD…</small></th>
+        <th>ADS<small>a standard for the result</small></th>
+      </tr>
+      <tr><td>prescribe the <b>steps</b><br><code>/plan → /execute → /verify</code></td><td>prescribes the <b>artifacts</b><br>what exists, where, in which shape</td></tr>
+      <tr><td>tied to one tool and today's models</td><td>any agent, any workflow, any model</td></tr>
+      <tr><td>right if you followed the process</td><td>checkable after the fact: <code>ads-lint</code> in CI</td></tr>
+    </table>
+  </main>
+
+  <footer><span>ADS · Agent Docs Standard</span><span>3 / 5</span></footer>
+</body>
+</html>
